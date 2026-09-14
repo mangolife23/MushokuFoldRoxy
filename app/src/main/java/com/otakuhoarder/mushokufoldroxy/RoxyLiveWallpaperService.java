@@ -27,56 +27,74 @@ public class RoxyLiveWallpaperService extends WallpaperService {
     }
 
     private class RoxyEngine extends Engine implements SensorEventListener {
+        private static final long FRAME_DELAY_MS = 16L;
+        private static final long AMBIENT_PULSE_INTERVAL_MS = 9000L;
+        private static final int PARTICLE_COUNT = 22;
+
         private final Handler handler = new Handler(Looper.getMainLooper());
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         private final Paint effectPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final List<Pulse> pulses = new ArrayList<>();
 
-        private Bitmap roxy;
+        private Bitmap sourceRoxy;
+        private Bitmap cachedRoxy;
         private SensorManager sensorManager;
         private Sensor accelerometer;
         private boolean visible;
         private long start = System.currentTimeMillis();
-        private long lastAutoPulse;
-        private int autoPulseIndex;
+        private long lastAmbientPulse;
+        private int ambientPulseIndex;
         private int width;
         private int height;
-        private float tiltX;
-        private float tiltY;
+        private float targetTiltX;
+        private float targetTiltY;
+        private float renderedTiltX;
+        private float renderedTiltY;
+
+        private final float[] pulseX = {0.50f, 0.34f, 0.67f, 0.51f};
+        private final float[] pulseY = {0.30f, 0.62f, 0.48f, 0.74f};
 
         private final Runnable drawRunner = new Runnable() {
-            @Override public void run() { drawFrame(); }
+            @Override
+            public void run() {
+                drawFrame();
+            }
         };
 
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
             super.onCreate(surfaceHolder);
             setTouchEventsEnabled(true);
-            roxy = BitmapFactory.decodeResource(getResources(), R.drawable.roxy_wallpaper);
+            sourceRoxy = BitmapFactory.decodeResource(getResources(), R.drawable.roxy_wallpaper);
             sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
             if (sensorManager != null) {
                 accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
             }
-            lastAutoPulse = System.currentTimeMillis() - 2500L;
         }
 
         @Override
         public void onDestroy() {
             handler.removeCallbacks(drawRunner);
             unregisterSensors();
-            if (roxy != null) roxy.recycle();
+            recycleCachedRoxy();
+            if (sourceRoxy != null && !sourceRoxy.isRecycled()) {
+                sourceRoxy.recycle();
+            }
             super.onDestroy();
         }
 
         @Override
         public void onVisibilityChanged(boolean isVisible) {
             visible = isVisible;
+            handler.removeCallbacks(drawRunner);
             if (visible) {
                 registerSensors();
+                long now = System.currentTimeMillis();
+                lastAmbientPulse = now;
+                addPulseInternal(width * 0.5f, height * 0.38f, now, 1.15f, 1);
                 drawFrame();
             } else {
                 unregisterSensors();
-                handler.removeCallbacks(drawRunner);
             }
         }
 
@@ -85,14 +103,15 @@ public class RoxyLiveWallpaperService extends WallpaperService {
             width = w;
             height = h;
             super.onSurfaceChanged(holder, format, w, h);
+            rebuildCachedRoxy();
             drawFrame();
         }
 
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
             visible = false;
-            unregisterSensors();
             handler.removeCallbacks(drawRunner);
+            unregisterSensors();
             super.onSurfaceDestroyed(holder);
         }
 
@@ -110,28 +129,28 @@ public class RoxyLiveWallpaperService extends WallpaperService {
                     || WallpaperManager.COMMAND_SECONDARY_TAP.equals(action)) {
                 float px = x >= 0 ? x : width * 0.5f;
                 float py = y >= 0 ? y : height * 0.5f;
-                addPulse(px, py, 1.25f, 1);
+                addPulse(px, py, 1.15f, 1);
             }
             return super.onCommand(action, x, y, z, extras, resultRequested);
         }
 
         private void registerSensors() {
             if (sensorManager != null && accelerometer != null) {
-                sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME);
+                sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI);
             }
         }
 
         private void unregisterSensors() {
-            if (sensorManager != null) sensorManager.unregisterListener(this);
+            if (sensorManager != null) {
+                sensorManager.unregisterListener(this);
+            }
         }
 
         @Override
         public void onSensorChanged(SensorEvent event) {
             if (event.sensor.getType() != Sensor.TYPE_ACCELEROMETER) return;
-            float targetX = clamp((-event.values[0] / SensorManager.GRAVITY_EARTH) * 34f, -34f, 34f);
-            float targetY = clamp((event.values[1] / SensorManager.GRAVITY_EARTH) * 22f, -22f, 22f);
-            tiltX = tiltX * 0.86f + targetX * 0.14f;
-            tiltY = tiltY * 0.86f + targetY * 0.14f;
+            targetTiltX = clamp((-event.values[0] / SensorManager.GRAVITY_EARTH) * 28f, -28f, 28f);
+            targetTiltY = clamp((event.values[1] / SensorManager.GRAVITY_EARTH) * 16f, -16f, 16f);
         }
 
         @Override
@@ -142,80 +161,106 @@ public class RoxyLiveWallpaperService extends WallpaperService {
         }
 
         private void addPulse(float x, float y, float power, int type) {
-            synchronized (pulses) {
-                pulses.add(new Pulse(x, y, System.currentTimeMillis(), power, type));
-            }
+            addPulseInternal(x, y, System.currentTimeMillis(), power, type);
             drawFrame();
         }
 
-        private void maybeAddAutoPulse(long now) {
-            if (!visible || width <= 0 || height <= 0 || now - lastAutoPulse < 3600L) return;
-            float[][] spots = {
-                    {0.50f, 0.28f},
-                    {0.33f, 0.58f},
-                    {0.68f, 0.46f},
-                    {0.50f, 0.72f}
-            };
-            float[] spot = spots[autoPulseIndex % spots.length];
-            autoPulseIndex++;
-            lastAutoPulse = now;
+        private void addPulseInternal(float x, float y, long born, float power, int type) {
+            if (width <= 0 || height <= 0) return;
             synchronized (pulses) {
-                pulses.add(new Pulse(width * spot[0], height * spot[1], now, 1.45f, 1));
+                pulses.add(new Pulse(x, y, born, power, type));
             }
+        }
+
+        private void maybeAddAmbientPulse(long now) {
+            if (!visible || width <= 0 || height <= 0 || now - lastAmbientPulse < AMBIENT_PULSE_INTERVAL_MS) {
+                return;
+            }
+            int index = ambientPulseIndex % pulseX.length;
+            ambientPulseIndex++;
+            lastAmbientPulse = now;
+            addPulseInternal(width * pulseX[index], height * pulseY[index], now, 0.72f, 2);
+        }
+
+        private void rebuildCachedRoxy() {
+            if (sourceRoxy == null || width <= 0 || height <= 0) return;
+
+            float overscan = 1.035f;
+            float scale = Math.max((float) width / sourceRoxy.getWidth(),
+                    (float) height / sourceRoxy.getHeight()) * overscan;
+            int scaledWidth = Math.max(1, Math.round(sourceRoxy.getWidth() * scale));
+            int scaledHeight = Math.max(1, Math.round(sourceRoxy.getHeight() * scale));
+
+            Bitmap newCache = Bitmap.createScaledBitmap(sourceRoxy, scaledWidth, scaledHeight, true);
+            recycleCachedRoxy();
+            cachedRoxy = newCache;
+        }
+
+        private void recycleCachedRoxy() {
+            if (cachedRoxy != null && cachedRoxy != sourceRoxy && !cachedRoxy.isRecycled()) {
+                cachedRoxy.recycle();
+            }
+            cachedRoxy = null;
         }
 
         private void drawFrame() {
             handler.removeCallbacks(drawRunner);
+            if (!visible && cachedRoxy == null) return;
+
             long now = System.currentTimeMillis();
-            maybeAddAutoPulse(now);
+            maybeAddAmbientPulse(now);
+
+            renderedTiltX += (targetTiltX - renderedTiltX) * 0.085f;
+            renderedTiltY += (targetTiltY - renderedTiltY) * 0.085f;
 
             SurfaceHolder holder = getSurfaceHolder();
             Canvas canvas = null;
             try {
                 canvas = holder.lockCanvas();
-                if (canvas != null && roxy != null) {
+                if (canvas != null && cachedRoxy != null) {
                     width = canvas.getWidth();
                     height = canvas.getHeight();
                     drawRoxy(canvas);
-                    drawAmbientMana(canvas);
+                    drawAmbientMana(canvas, now);
                     drawPulses(canvas, now);
                 }
             } finally {
-                if (canvas != null) holder.unlockCanvasAndPost(canvas);
+                if (canvas != null) {
+                    holder.unlockCanvasAndPost(canvas);
+                }
             }
-            if (visible) handler.postDelayed(drawRunner, 33);
+
+            if (visible) {
+                handler.postDelayed(drawRunner, FRAME_DELAY_MS);
+            }
         }
 
         private void drawRoxy(Canvas canvas) {
-            float scale = Math.max((float) width / roxy.getWidth(), (float) height / roxy.getHeight()) * 1.045f;
-            float dw = roxy.getWidth() * scale;
-            float dh = roxy.getHeight() * scale;
-            float left = (width - dw) / 2f + tiltX;
-            float top = (height - dh) / 2f + tiltY;
-
             canvas.drawColor(0xFF050A16);
-            canvas.save();
-            canvas.translate(left, top);
-            canvas.scale(scale, scale);
-            canvas.drawBitmap(roxy, 0, 0, paint);
-            canvas.restore();
+
+            float left = (width - cachedRoxy.getWidth()) * 0.5f + renderedTiltX;
+            float top = (height - cachedRoxy.getHeight()) * 0.5f + renderedTiltY;
+            canvas.drawBitmap(cachedRoxy, left, top, bitmapPaint);
 
             effectPaint.setStyle(Paint.Style.FILL);
-            effectPaint.setColor(0x20020A1B);
+            effectPaint.setColor(0x16020A1B);
             canvas.drawRect(0, 0, width, height, effectPaint);
         }
 
-        private void drawAmbientMana(Canvas canvas) {
-            float t = ((System.currentTimeMillis() - start) % 10000L) / 10000f;
-            for (int i = 0; i < 32; i++) {
+        private void drawAmbientMana(Canvas canvas, long now) {
+            float t = ((now - start) % 16000L) / 16000f;
+            for (int i = 0; i < PARTICLE_COUNT; i++) {
                 float seed = (i * 0.6180339f) % 1f;
-                float x = ((seed + t * (0.04f + (i % 4) * 0.012f)) % 1f) * width + tiltX * 0.35f;
-                float y = height - (((i * 0.137f + t * (0.35f + (i % 3) * 0.08f)) % 1f) * height) + tiltY * 0.2f;
-                float shimmer = 0.55f + 0.45f * (float)Math.sin((t * 6.283f) + i);
-                int alpha = 45 + (int)(90 * shimmer);
+                float speed = 0.025f + (i % 4) * 0.008f;
+                float x = ((seed + t * speed) % 1f) * width + renderedTiltX * 0.22f;
+                float y = height - (((i * 0.137f + t * (0.24f + (i % 3) * 0.055f)) % 1f) * height)
+                        + renderedTiltY * 0.12f;
+                float shimmer = 0.62f + 0.38f * (float) Math.sin((t * 6.283185f) + i * 0.72f);
+                int alpha = 24 + (int) (56 * shimmer);
+
                 effectPaint.setStyle(Paint.Style.FILL);
-                effectPaint.setColor((alpha << 24) | 0x9FEAFF);
-                canvas.drawCircle(x, y, 2.5f + (i % 4), effectPaint);
+                effectPaint.setColor((alpha << 24) | 0xA7EDFF);
+                canvas.drawCircle(x, y, 1.7f + (i % 3), effectPaint);
             }
         }
 
@@ -224,40 +269,45 @@ public class RoxyLiveWallpaperService extends WallpaperService {
                 Iterator<Pulse> it = pulses.iterator();
                 while (it.hasNext()) {
                     Pulse p = it.next();
+                    float duration = p.type == 2 ? 2.2f : 1.55f;
                     float age = (now - p.born) / 1000f;
-                    if (age > 1.45f) {
+                    if (age > duration) {
                         it.remove();
                         continue;
                     }
-                    float progress = age / 1.45f;
-                    int alpha = (int)(245 * (1f - progress));
-                    float radius = (30f + progress * Math.min(width, height) * 0.40f) * p.power;
+
+                    float progress = age / duration;
+                    float eased = 1f - (1f - progress) * (1f - progress);
+                    int baseAlpha = p.type == 2 ? 105 : 205;
+                    int alpha = (int) (baseAlpha * (1f - progress));
+                    float radius = (24f + eased * Math.min(width, height) * 0.29f) * p.power;
 
                     effectPaint.setStyle(Paint.Style.STROKE);
-                    effectPaint.setStrokeWidth(10f * (1f - progress) + 2f);
-                    int rgb = p.type == 1 ? 0xD7F7FF : 0x7EDBFF;
+                    effectPaint.setStrokeWidth((p.type == 2 ? 4f : 7f) * (1f - progress) + 1.2f);
+                    int rgb = p.type == 2 ? 0x9FEAFF : 0xD7F7FF;
                     effectPaint.setColor((alpha << 24) | rgb);
                     canvas.drawCircle(p.x, p.y, radius, effectPaint);
-                    canvas.drawCircle(p.x, p.y, radius * 0.64f, effectPaint);
-                    canvas.drawCircle(p.x, p.y, radius * 0.32f, effectPaint);
+                    canvas.drawCircle(p.x, p.y, radius * 0.62f, effectPaint);
 
                     if (p.type == 1) {
-                        for (int i = 0; i < 8; i++) {
-                            double a = i * Math.PI / 4d + progress * 1.7f;
-                            float sx = p.x + (float)Math.cos(a) * radius * 0.78f;
-                            float sy = p.y + (float)Math.sin(a) * radius * 0.78f;
+                        for (int i = 0; i < 6; i++) {
+                            double angle = i * Math.PI / 3d + eased * 1.2f;
+                            float sx = p.x + (float) Math.cos(angle) * radius * 0.76f;
+                            float sy = p.y + (float) Math.sin(angle) * radius * 0.76f;
                             effectPaint.setStyle(Paint.Style.FILL);
-                            canvas.drawCircle(sx, sy, 7f * (1f - progress) + 1.5f, effectPaint);
+                            canvas.drawCircle(sx, sy, 4.5f * (1f - progress) + 1f, effectPaint);
                         }
                     }
-                    effectPaint.setStyle(Paint.Style.FILL);
                 }
             }
+            effectPaint.setStyle(Paint.Style.FILL);
         }
     }
 
     private static class Pulse {
-        final float x, y, power;
+        final float x;
+        final float y;
+        final float power;
         final long born;
         final int type;
 
