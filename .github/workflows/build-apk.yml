@@ -1,0 +1,80 @@
+name: Build MushokuFoldRoxy APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android API 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Verify original Roxy artwork
+        run: |
+          test -f app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, struct
+
+          p = Path('app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg')
+          b = p.read_bytes()
+          expected_size = 281677
+          expected_sha = '515eb6b0b09b3b9c276635bcce70423aa33462ac44ce63dca0ff0a41aade1967'
+          assert len(b) == expected_size, f'wrong size: {len(b)}'
+          assert hashlib.sha256(b).hexdigest() == expected_sha, 'SHA-256 mismatch'
+          assert b[:2] == b'\xff\xd8' and b[-2:] == b'\xff\xd9', 'invalid JPEG markers'
+
+          i = 2
+          width = height = None
+          while i < len(b) - 9:
+              if b[i] != 0xFF:
+                  i += 1
+                  continue
+              marker = b[i + 1]
+              i += 2
+              if marker in (0xD8, 0xD9):
+                  continue
+              if i + 2 > len(b):
+                  break
+              seglen = int.from_bytes(b[i:i+2], 'big')
+              if marker in range(0xC0, 0xC4):
+                  height = int.from_bytes(b[i+3:i+5], 'big')
+                  width = int.from_bytes(b[i+5:i+7], 'big')
+                  break
+              i += seglen
+          assert (width, height) == (1087, 1536), f'wrong dimensions: {(width, height)}'
+          print(f'Roxy artwork verified: {width}x{height}, {len(b)} bytes, SHA-256 {expected_sha}')
+          PY
+
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/MushokuFoldRoxy-v0.1.0-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MushokuFoldRoxy-v0.1.0-debug
+          path: app/build/outputs/apk/debug/MushokuFoldRoxy-v0.1.0-debug.apk
