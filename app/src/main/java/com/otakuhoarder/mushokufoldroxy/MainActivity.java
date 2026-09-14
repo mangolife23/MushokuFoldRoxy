@@ -2,30 +2,86 @@ package com.otakuhoarder.mushokufoldroxy;
 
 import android.app.Activity;
 import android.app.WallpaperManager;
+import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.os.Bundle;
-import android.widget.Button;
+import android.widget.Switch;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
 import java.io.InputStream;
 
 public class MainActivity extends Activity {
+    private MagicOverlayView magicOverlay;
+    private TextView deviceState;
+    private TextView rotationStatus;
+    private SharedPreferences prefs;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Button apply = findViewById(R.id.applyWallpaper);
-        apply.setOnClickListener(v -> applyRoxyWallpaper());
+        prefs = getSharedPreferences("roxy_control", MODE_PRIVATE);
+        magicOverlay = findViewById(R.id.magicOverlay);
+        deviceState = findViewById(R.id.deviceState);
+        rotationStatus = findViewById(R.id.rotationStatus);
+        Switch rotationSwitch = findViewById(R.id.rotationSwitch);
+
+        findViewById(R.id.applyHome).setOnClickListener(v -> applyWallpaper(WallpaperManager.FLAG_SYSTEM, "Home screen"));
+        findViewById(R.id.applyLock).setOnClickListener(v -> applyWallpaper(WallpaperManager.FLAG_LOCK, "Lock screen"));
+        findViewById(R.id.applyBoth).setOnClickListener(v -> applyBoth());
+        findViewById(R.id.magicPulse).setOnClickListener(v -> magicOverlay.triggerBurst());
+
+        boolean rotation = prefs.getBoolean("rotation_enabled", false);
+        rotationSwitch.setChecked(rotation);
+        updateRotationText(rotation);
+        rotationSwitch.setOnCheckedChangeListener((button, enabled) -> {
+            prefs.edit().putBoolean("rotation_enabled", enabled).apply();
+            updateRotationText(enabled);
+            magicOverlay.triggerBurst();
+        });
+
+        updateDeviceState();
+        magicOverlay.triggerBurst();
     }
 
-    private void applyRoxyWallpaper() {
+    private void applyWallpaper(int flag, String target) {
         WallpaperManager manager = WallpaperManager.getInstance(this);
         try (InputStream image = getResources().openRawResource(R.drawable.roxy_wallpaper)) {
-            manager.setStream(image);
-            Toast.makeText(this, "Roxy wallpaper applied", Toast.LENGTH_SHORT).show();
-        } catch (IOException e) {
-            Toast.makeText(this, "Could not apply wallpaper", Toast.LENGTH_LONG).show();
+            manager.setStream(image, null, true, flag);
+            magicOverlay.triggerBurst();
+            Toast.makeText(this, "Roxy applied to " + target, Toast.LENGTH_SHORT).show();
+        } catch (IOException | SecurityException e) {
+            Toast.makeText(this, "Could not apply Roxy to " + target, Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void applyBoth() {
+        applyWallpaper(WallpaperManager.FLAG_SYSTEM, "Home screen");
+        applyWallpaper(WallpaperManager.FLAG_LOCK, "Lock screen");
+    }
+
+    private void updateRotationText(boolean enabled) {
+        rotationStatus.setText(enabled
+                ? "Rotation armed • add more Roxy scenes to activate the gallery cycle"
+                : "Ready for additional Roxy scenes");
+    }
+
+    private void updateDeviceState() {
+        int smallest = getResources().getConfiguration().smallestScreenWidthDp;
+        if (smallest >= 600) {
+            deviceState.setText("Fold open • Inner display mana mode");
+        } else {
+            deviceState.setText("Cover display • Compact mana mode");
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        updateDeviceState();
+        magicOverlay.triggerBurst();
     }
 }
