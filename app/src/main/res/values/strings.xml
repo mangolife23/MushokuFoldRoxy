@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MushokuFold Roxy</string>
+    <string name="roxy_live_wallpaper_name">Roxy Mana Live Wallpaper</string>
+    <string name="roxy_live_wallpaper_description">Animated Roxy wallpaper with mana particles and touch-reactive spell pulses.</string>
+</resources>
