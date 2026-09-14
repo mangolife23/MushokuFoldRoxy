@@ -2,6 +2,8 @@ package com.otakuhoarder.mushokufoldroxy;
 
 import android.app.Activity;
 import android.app.WallpaperManager;
+import android.content.ComponentName;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.os.Bundle;
@@ -33,6 +35,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.applyLock).setOnClickListener(v -> applyWallpaper(WallpaperManager.FLAG_LOCK, "Lock screen"));
         findViewById(R.id.applyBoth).setOnClickListener(v -> applyBoth());
         findViewById(R.id.magicPulse).setOnClickListener(v -> magicOverlay.triggerBurst());
+        findViewById(R.id.liveWallpaper).setOnClickListener(v -> openLiveWallpaper());
 
         boolean rotation = prefs.getBoolean("rotation_enabled", false);
         rotationSwitch.setChecked(rotation);
@@ -45,6 +48,18 @@ public class MainActivity extends Activity {
 
         updateDeviceState();
         magicOverlay.triggerBurst();
+    }
+
+    private void openLiveWallpaper() {
+        try {
+            Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+            intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                    new ComponentName(this, RoxyLiveWallpaperService.class));
+            startActivity(intent);
+        } catch (Exception e) {
+            Intent chooser = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
+            startActivity(chooser);
+        }
     }
 
     private void applyWallpaper(int flag, String target) {
@@ -71,11 +86,8 @@ public class MainActivity extends Activity {
 
     private void updateDeviceState() {
         int smallest = getResources().getConfiguration().smallestScreenWidthDp;
-        if (smallest >= 600) {
-            deviceState.setText("Fold open • Inner display mana mode");
-        } else {
-            deviceState.setText("Cover display • Compact mana mode");
-        }
+        if (smallest >= 600) deviceState.setText("Fold open • Inner display mana mode");
+        else deviceState.setText("Cover display • Compact mana mode");
     }
 
     @Override
