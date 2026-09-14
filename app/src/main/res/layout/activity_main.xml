@@ -5,172 +5,41 @@
     android:layout_height="match_parent"
     android:background="#070B18">
 
-    <ImageView
-        android:id="@+id/roxyPreview"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="Roxy wallpaper preview"
-        android:scaleType="centerCrop"
-        android:src="@drawable/roxy_wallpaper" />
+    <ImageView android:id="@+id/roxyPreview" android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="Roxy wallpaper preview" android:scaleType="centerCrop" android:src="@drawable/roxy_wallpaper" />
+    <View android:layout_width="match_parent" android:layout_height="match_parent" android:background="#55030A19" />
+    <com.otakuhoarder.mushokufoldroxy.MagicOverlayView android:id="@+id/magicOverlay" android:layout_width="match_parent" android:layout_height="match_parent" />
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#55030A19" />
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingLeft="22dp" android:paddingTop="42dp" android:paddingRight="22dp" android:paddingBottom="32dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MUSHOKUFOLD" android:textColor="#BFEFFF" android:textSize="13sp" android:textStyle="bold" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="ROXY CONTROL CENTER" android:textColor="#FFFFFF" android:textSize="29sp" android:textStyle="bold" />
+            <TextView android:id="@+id/deviceState" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:background="#990A1830" android:padding="10dp" android:text="Mana system ready" android:textColor="#CDEFFF" android:textSize="13sp" />
+            <Space android:layout_width="1dp" android:layout_height="230dp" />
 
-    <com.otakuhoarder.mushokufoldroxy.MagicOverlayView
-        android:id="@+id/magicOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:background="#E00A1327" android:orientation="vertical" android:padding="18dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="LIVE MANA WALLPAPER" android:textColor="#8DDFFF" android:textSize="12sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Roxy • Touch Reactive" android:textColor="#FFFFFF" android:textSize="21sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Ambient mana drifts across Roxy. Tap the wallpaper for spell ripples; upper-screen taps cast a stronger burst." android:textColor="#C5D8EE" android:textSize="13sp" />
+                <Button android:id="@+id/liveWallpaper" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Preview &amp; Apply Live Roxy" />
+                <Button android:id="@+id/magicPulse" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Test Mana Pulse" />
+            </LinearLayout>
 
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingLeft="22dp"
-            android:paddingTop="42dp"
-            android:paddingRight="22dp"
-            android:paddingBottom="32dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="MUSHOKUFOLD"
-                android:textColor="#BFEFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="ROXY CONTROL CENTER"
-                android:textColor="#FFFFFF"
-                android:textSize="29sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/deviceState"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="#990A1830"
-                android:padding="10dp"
-                android:text="Mana system ready"
-                android:textColor="#CDEFFF"
-                android:textSize="13sp" />
-
-            <Space
-                android:layout_width="1dp"
-                android:layout_height="260dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="#D90A1327"
-                android:orientation="vertical"
-                android:padding="18dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="WALLPAPER PROFILE"
-                    android:textColor="#8DDFFF"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:text="Roxy • Original HD"
-                    android:textColor="#FFFFFF"
-                    android:textSize="21sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/applyHome"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Home" />
-
-                    <Button
-                        android:id="@+id/applyLock"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="8dp"
-                        android:layout_weight="1"
-                        android:text="Lock" />
-
-                    <Button
-                        android:id="@+id/applyBoth"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="8dp"
-                        android:layout_weight="1"
-                        android:text="Both" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="#D90A1327" android:orientation="vertical" android:padding="18dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="STATIC WALLPAPER" android:textColor="#8DDFFF" android:textSize="12sp" android:textStyle="bold" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
+                    <Button android:id="@+id/applyHome" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Home" />
+                    <Button android:id="@+id/applyLock" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginLeft="8dp" android:layout_weight="1" android:text="Lock" />
+                    <Button android:id="@+id/applyBoth" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginLeft="8dp" android:layout_weight="1" android:text="Both" />
                 </LinearLayout>
-
-                <Button
-                    android:id="@+id/magicPulse"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Cast Mana Pulse" />
             </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:background="#D90A1327"
-                android:orientation="vertical"
-                android:padding="18dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="ROXY ROTATION"
-                    android:textColor="#8DDFFF"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <Switch
-                    android:id="@+id/rotationSwitch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Rotate Roxy scenes automatically"
-                    android:textColor="#FFFFFF" />
-
-                <TextView
-                    android:id="@+id/rotationStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Ready for additional Roxy scenes"
-                    android:textColor="#B9CBE3"
-                    android:textSize="13sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="#D90A1327" android:orientation="vertical" android:padding="18dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ROXY ROTATION" android:textColor="#8DDFFF" android:textSize="12sp" android:textStyle="bold" />
+                <Switch android:id="@+id/rotationSwitch" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Rotate Roxy scenes automatically" android:textColor="#FFFFFF" />
+                <TextView android:id="@+id/rotationStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ready for additional Roxy scenes" android:textColor="#B9CBE3" android:textSize="13sp" />
             </LinearLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:text="v0.2 • Roxy Edition"
-                android:textColor="#9AB1CE"
-                android:textSize="12sp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="v0.3 • Roxy Live Mana Edition" android:textColor="#9AB1CE" android:textSize="12sp" />
         </LinearLayout>
     </ScrollView>
 </FrameLayout>
