@@ -1,9 +1,11 @@
 package com.otakuhoarder.mushokufoldroxy;
 
+import android.app.WallpaperManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.wallpaper.WallpaperService;
@@ -75,22 +77,37 @@ public class RoxyLiveWallpaperService extends WallpaperService {
 
         @Override
         public void onTouchEvent(MotionEvent event) {
-            if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                float power = 1f;
-                int type = 0;
-                if (event.getY() < height * 0.42f) {
-                    power = 1.45f;
-                    type = 1;
-                } else if (event.getX() > width * 0.65f) {
-                    power = 1.25f;
-                    type = 2;
-                }
-                synchronized (pulses) {
-                    pulses.add(new Pulse(event.getX(), event.getY(), System.currentTimeMillis(), power, type));
-                }
-                drawFrame();
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                addPulse(event.getX(), event.getY());
             }
             super.onTouchEvent(event);
+        }
+
+        @Override
+        public Bundle onCommand(String action, int x, int y, int z, Bundle extras, boolean resultRequested) {
+            if (WallpaperManager.COMMAND_TAP.equals(action)
+                    || WallpaperManager.COMMAND_SECONDARY_TAP.equals(action)) {
+                float px = x >= 0 ? x : width * 0.5f;
+                float py = y >= 0 ? y : height * 0.5f;
+                addPulse(px, py);
+            }
+            return super.onCommand(action, x, y, z, extras, resultRequested);
+        }
+
+        private void addPulse(float x, float y) {
+            float power = 1f;
+            int type = 0;
+            if (y < height * 0.42f) {
+                power = 1.55f;
+                type = 1;
+            } else if (x > width * 0.65f) {
+                power = 1.3f;
+                type = 2;
+            }
+            synchronized (pulses) {
+                pulses.add(new Pulse(x, y, System.currentTimeMillis(), power, type));
+            }
+            drawFrame();
         }
 
         private void drawFrame() {
@@ -136,6 +153,7 @@ public class RoxyLiveWallpaperService extends WallpaperService {
                 float y = height - (((i * 0.137f + t * (0.35f + (i % 3) * 0.08f)) % 1f) * height);
                 float shimmer = 0.55f + 0.45f * (float)Math.sin((t * 6.283f) + i);
                 int alpha = 35 + (int)(75 * shimmer);
+                effectPaint.setStyle(Paint.Style.FILL);
                 effectPaint.setColor((alpha << 24) | 0x9FEAFF);
                 canvas.drawCircle(x, y, 2f + (i % 4), effectPaint);
             }
@@ -153,10 +171,10 @@ public class RoxyLiveWallpaperService extends WallpaperService {
                         continue;
                     }
                     float progress = age / 1.25f;
-                    int alpha = (int)(220 * (1f - progress));
-                    float radius = (35f + progress * Math.min(width, height) * 0.34f) * p.power;
+                    int alpha = (int)(235 * (1f - progress));
+                    float radius = (35f + progress * Math.min(width, height) * 0.38f) * p.power;
                     effectPaint.setStyle(Paint.Style.STROKE);
-                    effectPaint.setStrokeWidth(7f * (1f - progress) + 2f);
+                    effectPaint.setStrokeWidth(9f * (1f - progress) + 2f);
                     int rgb = p.type == 1 ? 0xD7F7FF : (p.type == 2 ? 0x8EBBFF : 0x7EDBFF);
                     effectPaint.setColor((alpha << 24) | rgb);
                     canvas.drawCircle(p.x, p.y, radius, effectPaint);
@@ -168,7 +186,7 @@ public class RoxyLiveWallpaperService extends WallpaperService {
                             float sx = p.x + (float)Math.cos(a) * radius * 0.78f;
                             float sy = p.y + (float)Math.sin(a) * radius * 0.78f;
                             effectPaint.setStyle(Paint.Style.FILL);
-                            canvas.drawCircle(sx, sy, 5f * (1f - progress) + 1f, effectPaint);
+                            canvas.drawCircle(sx, sy, 6f * (1f - progress) + 1f, effectPaint);
                         }
                     }
                     effectPaint.setStyle(Paint.Style.FILL);
