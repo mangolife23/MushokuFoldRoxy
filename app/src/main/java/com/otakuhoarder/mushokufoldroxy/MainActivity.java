@@ -31,7 +31,8 @@ public class MainActivity extends Activity {
         findViewById(R.id.liveWallpaper).setOnClickListener(v->openLiveWallpaper());
         boolean rotation=prefs.getBoolean("rotation_enabled",true); rotationSwitch.setChecked(rotation); updateRotationText(rotation);
         rotationSwitch.setOnCheckedChangeListener((button,enabled)->{prefs.edit().putBoolean("rotation_enabled",enabled).apply();updateRotationText(enabled);magicOverlay.triggerBurst();});
-        versionText.setText("v"+BuildConfig.VERSION_NAME+" • Roxy Live Mana Edition"); updateDeviceState(); magicOverlay.triggerBurst();
+        String version="0.8.0"; try{version=getPackageManager().getPackageInfo(getPackageName(),0).versionName;}catch(Exception ignored){}
+        versionText.setText("v"+version+" • Roxy Live Mana Edition"); updateDeviceState(); magicOverlay.triggerBurst();
     }
     private void openLiveWallpaper(){try{Intent i=new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);i.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,new ComponentName(this,RoxyLiveWallpaperService.class));startActivity(i);}catch(Exception e){startActivity(new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER));}}
     private void applyWallpaper(int flag,String target){WallpaperManager m=WallpaperManager.getInstance(this);try(InputStream image=getResources().openRawResource(R.drawable.roxy_wallpaper)){m.setStream(image,null,true,flag);magicOverlay.triggerBurst();Toast.makeText(this,"Roxy applied to "+target,Toast.LENGTH_SHORT).show();}catch(IOException|SecurityException e){Toast.makeText(this,"Could not apply Roxy to "+target,Toast.LENGTH_LONG).show();}}
