@@ -1,7 +1,7 @@
 name: Build MushokuFoldRoxy APK
 on:
   push:
-    branches: [ "main", "roxy-duolauncher-integration" ]
+    branches: [ "main", "roxy-duolauncher-integration", "roxy-duo-rebuild" ]
   workflow_dispatch:
 jobs:
   build:
@@ -35,17 +35,16 @@ jobs:
           files=['roxy_wallpaper.jpg','roxy_scene_02.jpeg','roxy_scene_03.jpg','roxy_scene_04.jpg','roxy_scene_05.jpg']
           root=Path('app/src/main/res/drawable-nodpi')
           for f in files:
-              d=(root/f).read_bytes(); assert d[:2]==b'\xff\xd8' and d[-2:]==b'\xff\xd9', f'{f}: invalid JPEG'
-              print(f,len(d),hashlib.sha256(d).hexdigest())
+              d=(root/f).read_bytes(); assert d[:2]==b'\xff\xd8' and d[-2:]==b'\xff\xd9'
           b=(root/'roxy_wallpaper.jpg').read_bytes(); assert len(b)==281677
           assert hashlib.sha256(b).hexdigest()=='515eb6b0b09b3b9c276635bcce70423aa33462ac44ce63dca0ff0a41aade1967'
           PY
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/MushokuFoldRoxy-Launcher-1.0.0-alpha1-debug.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/MushokuFoldRoxy-Duo-alpha3-debug.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MushokuFoldRoxy-Launcher-1.0.0-alpha1-debug
-          path: app/build/outputs/apk/debug/MushokuFoldRoxy-Launcher-1.0.0-alpha1-debug.apk
+          name: MushokuFoldRoxy-Duo-alpha3-debug
+          path: app/build/outputs/apk/debug/MushokuFoldRoxy-Duo-alpha3-debug.apk
