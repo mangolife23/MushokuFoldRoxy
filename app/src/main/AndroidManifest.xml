@@ -7,26 +7,24 @@
         android:allowBackup="true"
         android:label="MushokuFold Roxy"
         android:theme="@style/Theme.MushokuFoldRoxy">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".RoxyLiveWallpaperService"
-            android:exported="true"
-            android:label="@string/roxy_live_wallpaper_name"
-            android:permission="android.permission.BIND_WALLPAPER">
+        <activity android:name=".RoxyHomeActivity" android:exported="true" android:launchMode="singleTask" android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|uiMode">
             <intent-filter>
-                <action android:name="android.service.wallpaper.WallpaperService" />
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-            <meta-data
-                android:name="android.service.wallpaper"
-                android:resource="@xml/roxy_wallpaper" />
+        </activity>
+
+        <service android:name=".RoxyLiveWallpaperService" android:exported="true" android:label="@string/roxy_live_wallpaper_name" android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/roxy_wallpaper" />
         </service>
     </application>
 </manifest>
