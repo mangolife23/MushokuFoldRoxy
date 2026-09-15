@@ -1,10 +1,8 @@
 name: Build MushokuFoldRoxy APK
-
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,28 +29,23 @@ jobs:
           gradle-version: '8.13'
       - name: Verify Roxy artwork
         run: |
-          test -f app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg
-          test -f app/src/main/res/drawable-nodpi/roxy_scene_02.jpeg
-          test -f app/src/main/res/drawable-nodpi/roxy_scene_03.jpg
-          test -f app/src/main/res/drawable-nodpi/roxy_scene_04.jpg
-          test -f app/src/main/res/drawable-nodpi/roxy_scene_05.jpg
           python3 - <<'PY'
           from pathlib import Path
           import hashlib
-          p=Path('app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg'); b=p.read_bytes()
-          assert len(b)==281677
+          files=['roxy_wallpaper.jpg','roxy_scene_02.jpeg','roxy_scene_03.jpg','roxy_scene_04.jpg','roxy_scene_05.jpg']
+          root=Path('app/src/main/res/drawable-nodpi')
+          for f in files:
+              d=(root/f).read_bytes(); assert d[:2]==b'\xff\xd8' and d[-2:]==b'\xff\xd9', f'{f}: invalid JPEG'
+              print(f,len(d),hashlib.sha256(d).hexdigest())
+          b=(root/'roxy_wallpaper.jpg').read_bytes(); assert len(b)==281677
           assert hashlib.sha256(b).hexdigest()=='515eb6b0b09b3b9c276635bcce70423aa33462ac44ce63dca0ff0a41aade1967'
-          for f in ['roxy_wallpaper.jpg','roxy_scene_02.jpeg','roxy_scene_03.jpg','roxy_scene_04.jpg','roxy_scene_05.jpg']:
-              d=Path('app/src/main/res/drawable-nodpi',f).read_bytes()
-              assert d[:2]==b'\xff\xd8' and d[-2:]==b'\xff\xd9', f'{f}: invalid JPEG'
-              print(f, len(d), hashlib.sha256(d).hexdigest())
           PY
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/MushokuFoldRoxy-v0.7.0-debug.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/MushokuFoldRoxy-v0.8.0-debug.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MushokuFoldRoxy-v0.7.0-debug
-          path: app/build/outputs/apk/debug/MushokuFoldRoxy-v0.7.0-debug.apk
+          name: MushokuFoldRoxy-v0.8.0-debug
+          path: app/build/outputs/apk/debug/MushokuFoldRoxy-v0.8.0-debug.apk
