@@ -1,7 +1,7 @@
 name: Build MushokuFoldRoxy APK
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "roxy-duolauncher-integration" ]
   workflow_dispatch:
 jobs:
   build:
@@ -43,9 +43,9 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/MushokuFoldRoxy-v0.8.0-debug.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/MushokuFoldRoxy-Launcher-1.0.0-alpha1-debug.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MushokuFoldRoxy-v0.8.0-debug
-          path: app/build/outputs/apk/debug/MushokuFoldRoxy-v0.8.0-debug.apk
+          name: MushokuFoldRoxy-Launcher-1.0.0-alpha1-debug
+          path: app/build/outputs/apk/debug/MushokuFoldRoxy-Launcher-1.0.0-alpha1-debug.apk
