@@ -49,8 +49,10 @@ internal fun AppearanceSettings(state: AppearanceState, onMode: (AppearanceMode)
                 AppearanceFeedback(inputError, MaterialTheme.colorScheme.error, "appearance-manual-status")
                 OutlinedButton(onClick = {
                     focusManager.clearFocus(); keyboard?.hide(); onDeviceLocation()
-                }, modifier = Modifier.fillMaxWidth().testTag("appearance-device-location")) { Text("Use device location") }
-                AppearanceFeedback(state.locationStatus, MaterialTheme.colorScheme.onSurfaceVariant, "appearance-location-status")
+                }, modifier = Modifier.fillMaxWidth()
+                    .testTag("appearance-device-location")) { Text("Use device location") }
+                AppearanceFeedback(state.locationStatus, MaterialTheme.colorScheme.onSurfaceVariant,
+                    "appearance-location-status")
                 if (state.latitude != null) TextButton(onClick = onClear, Modifier.fillMaxWidth()) { Text("Clear location") }
             }
         }
