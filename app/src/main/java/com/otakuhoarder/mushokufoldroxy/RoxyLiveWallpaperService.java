@@ -1,61 +1,28 @@
 package com.otakuhoarder.mushokufoldroxy;
-
-import android.app.WallpaperManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
-import android.graphics.Paint;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
-import android.os.Bundle;
-import android.service.wallpaper.WallpaperService;
-import android.view.Choreographer;
-import android.view.MotionEvent;
-import android.view.SurfaceHolder;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
-public class RoxyLiveWallpaperService extends WallpaperService {
+import android.app.WallpaperManager;import android.content.SharedPreferences;import android.graphics.*;import android.hardware.*;import android.os.Bundle;import android.service.wallpaper.WallpaperService;import android.view.*;import java.util.*;
+public class RoxyLiveWallpaperService extends WallpaperService{
  @Override public Engine onCreateEngine(){return new RoxyEngine();}
  private class RoxyEngine extends Engine implements SensorEventListener,Choreographer.FrameCallback{
-  private static final long PULSE_MS=9000L,SCENE_MS=30000L,FADE_MS=1800L;
-  private static final int PARTICLES=22;
-  private final int[] scenes={R.drawable.roxy_wallpaper,R.drawable.roxy_scene_02,R.drawable.roxy_scene_03,R.drawable.roxy_scene_04,R.drawable.roxy_scene_05};
-  private final Paint bitmapPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG),effectPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
-  private final List<Pulse> pulses=new ArrayList<>(); private final float[] rm=new float[9],ori=new float[3];
-  private Bitmap currentSource,nextSource,currentCache,nextCache; private int sceneIndex;
-  private SensorManager sm; private Sensor rv,acc; private boolean visible,posted,transitioning;
-  private int width,height,ambientIndex; private long start=System.currentTimeMillis(),lastPulse,lastScene,transitionStart;
-  private float neutralPitch=Float.NaN,neutralRoll=Float.NaN,targetX,targetY,renderX,renderY;
-  private final float[] px={.50f,.34f,.67f,.51f},py={.30f,.62f,.48f,.74f};
-  @Override public void onCreate(SurfaceHolder h){super.onCreate(h);setTouchEventsEnabled(true);currentSource=BitmapFactory.decodeResource(getResources(),scenes[0]);sm=(SensorManager)getSystemService(SENSOR_SERVICE);if(sm!=null){rv=sm.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);if(rv==null)rv=sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);acc=sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);}}
-  @Override public void onDestroy(){stop();unregister();recycle(currentCache);recycle(nextCache);recycle(currentSource);recycle(nextSource);super.onDestroy();}
-  @Override public void onVisibilityChanged(boolean v){visible=v;if(v){neutralPitch=neutralRoll=Float.NaN;register();long n=System.currentTimeMillis();lastPulse=n;if(lastScene==0)lastScene=n;addPulse(width*.5f,height*.38f,n,1.15f,1);request();}else{stop();unregister();}}
-  @Override public void onSurfaceChanged(SurfaceHolder h,int f,int w,int he){width=w;height=he;super.onSurfaceChanged(h,f,w,he);rebuild();request();}
-  @Override public void onSurfaceDestroyed(SurfaceHolder h){visible=false;stop();unregister();super.onSurfaceDestroyed(h);}
-  @Override public void onTouchEvent(MotionEvent e){if(e.getActionMasked()==MotionEvent.ACTION_DOWN)addPulse(e.getX(),e.getY(),System.currentTimeMillis(),1f,0);super.onTouchEvent(e);}
-  @Override public Bundle onCommand(String a,int x,int y,int z,Bundle b,boolean r){if(WallpaperManager.COMMAND_TAP.equals(a)||WallpaperManager.COMMAND_SECONDARY_TAP.equals(a))addPulse(x>=0?x:width*.5f,y>=0?y:height*.5f,System.currentTimeMillis(),1.15f,1);return super.onCommand(a,x,y,z,b,r);}
-  private void register(){if(sm==null)return;if(rv!=null)sm.registerListener(this,rv,16666);else if(acc!=null)sm.registerListener(this,acc,20000);}
-  private void unregister(){if(sm!=null)sm.unregisterListener(this);}
-  @Override public void onSensorChanged(SensorEvent e){if(e.sensor==rv){SensorManager.getRotationMatrixFromVector(rm,e.values);SensorManager.getOrientation(rm,ori);float p=ori[1],r=ori[2];if(Float.isNaN(neutralPitch)){neutralPitch=p;neutralRoll=r;}targetX=clamp(wrap(r-neutralRoll)*145f,-52,52);targetY=clamp(-wrap(p-neutralPitch)*115f,-38,38);}else if(e.sensor==acc){targetX=clamp((-e.values[0]/SensorManager.GRAVITY_EARTH)*46,-46,46);targetY=clamp((e.values[1]/SensorManager.GRAVITY_EARTH)*30,-30,30);}}
-  @Override public void onAccuracyChanged(Sensor s,int a){}
-  private float wrap(float a){while(a>Math.PI)a-=(float)(Math.PI*2);while(a<-Math.PI)a+=(float)(Math.PI*2);return a;} private float clamp(float v,float a,float b){return Math.max(a,Math.min(b,v));}
-  private void request(){if(!posted){posted=true;Choreographer.getInstance().postFrameCallback(this);}} private void stop(){Choreographer.getInstance().removeFrameCallback(this);posted=false;}
-  @Override public void doFrame(long n){posted=false;draw();if(visible)request();}
-  private void maybeScene(long n){if(!transitioning&&n-lastScene>=SCENE_MS){int ni=(sceneIndex+1)%scenes.length;nextSource=BitmapFactory.decodeResource(getResources(),scenes[ni]);nextCache=scale(nextSource);if(nextCache!=null){transitioning=true;transitionStart=n;addPulse(width*.5f,height*.5f,n,1.5f,1);}else recycle(nextSource);}}
-  private void finishScene(long n){recycle(currentCache);recycle(currentSource);currentCache=nextCache;currentSource=nextSource;nextCache=nextSource=null;sceneIndex=(sceneIndex+1)%scenes.length;transitioning=false;lastScene=n;}
-  private Bitmap scale(Bitmap s){if(s==null||width<=0||height<=0)return null;float z=Math.max((float)width/s.getWidth(),(float)height/s.getHeight())*1.075f;return Bitmap.createScaledBitmap(s,Math.max(1,Math.round(s.getWidth()*z)),Math.max(1,Math.round(s.getHeight()*z)),true);}
-  private void rebuild(){Bitmap b=scale(currentSource);recycle(currentCache);currentCache=b;if(transitioning){Bitmap nb=scale(nextSource);recycle(nextCache);nextCache=nb;}}
-  private void recycle(Bitmap b){if(b!=null&&!b.isRecycled())b.recycle();}
-  private void addPulse(float x,float y,long born,float power,int type){if(width>0&&height>0)synchronized(pulses){pulses.add(new Pulse(x,y,born,power,type));}request();}
-  private void ambient(long n){if(n-lastPulse<PULSE_MS)return;int i=ambientIndex++%px.length;lastPulse=n;addPulse(width*px[i],height*py[i],n,.72f,2);}
-  private void draw(){if(currentCache==null)return;long n=System.currentTimeMillis();maybeScene(n);ambient(n);renderX+=(targetX-renderX)*.22f;renderY+=(targetY-renderY)*.22f;Canvas c=null;try{c=getSurfaceHolder().lockCanvas();if(c!=null){width=c.getWidth();height=c.getHeight();c.drawColor(0xFF050A16);drawBitmap(c,currentCache,255);if(transitioning&&nextCache!=null){float p=Math.min(1f,(n-transitionStart)/(float)FADE_MS);float eased=p*p*(3f-2f*p);drawBitmap(c,nextCache,(int)(255*eased));if(p>=1f)finishScene(n);}effectPaint.setStyle(Paint.Style.FILL);effectPaint.setColor(0x14020A1B);c.drawRect(0,0,width,height,effectPaint);mana(c,n);drawPulses(c,n);}}finally{if(c!=null)getSurfaceHolder().unlockCanvasAndPost(c);}}
-  private void drawBitmap(Canvas c,Bitmap b,int alpha){bitmapPaint.setAlpha(alpha);float l=(width-b.getWidth())*.5f+renderX,t=(height-b.getHeight())*.5f+renderY;c.drawBitmap(b,l,t,bitmapPaint);bitmapPaint.setAlpha(255);}
-  private void mana(Canvas c,long n){float t=((n-start)%16000L)/16000f;for(int i=0;i<PARTICLES;i++){float seed=(i*.6180339f)%1f,x=((seed+t*(.025f+(i%4)*.008f))%1f)*width+renderX*.34f,y=height-(((i*.137f+t*(.24f+(i%3)*.055f))%1f)*height)+renderY*.22f,sh=.62f+.38f*(float)Math.sin(t*6.283185f+i*.72f);int a=24+(int)(56*sh);effectPaint.setStyle(Paint.Style.FILL);effectPaint.setColor((a<<24)|0xA7EDFF);c.drawCircle(x,y,1.7f+(i%3),effectPaint);}}
-  private void drawPulses(Canvas c,long n){synchronized(pulses){Iterator<Pulse>it=pulses.iterator();while(it.hasNext()){Pulse p=it.next();float d=p.type==2?2.2f:1.55f,age=(n-p.born)/1000f;if(age>d){it.remove();continue;}float q=age/d,e=1-(1-q)*(1-q);int a=(int)((p.type==2?105:205)*(1-q));float rad=(24+e*Math.min(width,height)*.29f)*p.power;effectPaint.setStyle(Paint.Style.STROKE);effectPaint.setStrokeWidth((p.type==2?4:7)*(1-q)+1.2f);effectPaint.setColor((a<<24)|(p.type==2?0x9FEAFF:0xD7F7FF));c.drawCircle(p.x,p.y,rad,effectPaint);c.drawCircle(p.x,p.y,rad*.62f,effectPaint);}}effectPaint.setStyle(Paint.Style.FILL);}
+  static final long PULSE_MS=9000,SCENE_MS=30000,FADE_MS=2100; final int[] scenes={R.drawable.roxy_wallpaper,R.drawable.roxy_scene_02,R.drawable.roxy_scene_03,R.drawable.roxy_scene_04,R.drawable.roxy_scene_05};
+  final float[] focalX={.50f,.50f,.50f,.56f,.50f},focalY={.50f,.47f,.43f,.50f,.48f},manaPower={1f,.72f,1.35f,.82f,.88f}; final Paint bp=new Paint(3),ep=new Paint(1);final List<Pulse> pulses=new ArrayList<>();final float[] rm=new float[9],ori=new float[3];
+  SharedPreferences prefs;Bitmap src,nextSrc,cache,nextCache;SensorManager sm;Sensor rv,acc;boolean visible,posted,transition;int scene,w,h,ambient;long start=System.currentTimeMillis(),lastPulse,lastScene,transStart;float np=Float.NaN,nr=Float.NaN,tx,ty,rx,ry;
+  @Override public void onCreate(SurfaceHolder sh){super.onCreate(sh);setTouchEventsEnabled(true);prefs=getSharedPreferences("roxy_control",MODE_PRIVATE);src=BitmapFactory.decodeResource(getResources(),scenes[0]);sm=(SensorManager)getSystemService(SENSOR_SERVICE);if(sm!=null){rv=sm.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);if(rv==null)rv=sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);acc=sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);}}
+  @Override public void onDestroy(){stop();unreg();rec(cache);rec(nextCache);rec(src);rec(nextSrc);super.onDestroy();}
+  @Override public void onVisibilityChanged(boolean v){visible=v;if(v){np=nr=Float.NaN;reg();long n=System.currentTimeMillis();lastPulse=n;if(lastScene==0)lastScene=n;pulse(w*.5f,h*.38f,n,1.15f,1);req();}else{stop();unreg();}}
+  @Override public void onSurfaceChanged(SurfaceHolder s,int f,int W,int H){w=W;h=H;super.onSurfaceChanged(s,f,W,H);rebuild();req();}@Override public void onSurfaceDestroyed(SurfaceHolder s){visible=false;stop();unreg();super.onSurfaceDestroyed(s);}
+  @Override public void onTouchEvent(MotionEvent e){if(e.getActionMasked()==0)pulse(e.getX(),e.getY(),System.currentTimeMillis(),1,0);super.onTouchEvent(e);}@Override public Bundle onCommand(String a,int x,int y,int z,Bundle b,boolean r){if(WallpaperManager.COMMAND_TAP.equals(a)||WallpaperManager.COMMAND_SECONDARY_TAP.equals(a))pulse(x>=0?x:w*.5f,y>=0?y:h*.5f,System.currentTimeMillis(),1.15f,1);return super.onCommand(a,x,y,z,b,r);}
+  void reg(){if(sm==null)return;if(rv!=null)sm.registerListener(this,rv,16666);else if(acc!=null)sm.registerListener(this,acc,20000);}void unreg(){if(sm!=null)sm.unregisterListener(this);}@Override public void onAccuracyChanged(Sensor s,int a){}
+  @Override public void onSensorChanged(SensorEvent e){if(e.sensor==rv){SensorManager.getRotationMatrixFromVector(rm,e.values);SensorManager.getOrientation(rm,ori);float p=ori[1],r=ori[2];if(Float.isNaN(np)){np=p;nr=r;}tx=clamp(wrap(r-nr)*145,-52,52);ty=clamp(-wrap(p-np)*115,-38,38);}else if(e.sensor==acc){tx=clamp(-e.values[0]/SensorManager.GRAVITY_EARTH*46,-46,46);ty=clamp(e.values[1]/SensorManager.GRAVITY_EARTH*30,-30,30);}}
+  float wrap(float a){while(a>Math.PI)a-=Math.PI*2;while(a<-Math.PI)a+=Math.PI*2;return a;}float clamp(float v,float a,float b){return Math.max(a,Math.min(b,v));}void req(){if(!posted){posted=true;Choreographer.getInstance().postFrameCallback(this);}}void stop(){Choreographer.getInstance().removeFrameCallback(this);posted=false;}@Override public void doFrame(long n){posted=false;draw();if(visible)req();}
+  void maybeScene(long n){if(!prefs.getBoolean("rotation_enabled",true)||transition||n-lastScene<SCENE_MS)return;int ni=(scene+1)%scenes.length;nextSrc=BitmapFactory.decodeResource(getResources(),scenes[ni]);nextCache=scale(nextSrc);if(nextCache!=null){transition=true;transStart=n;pulse(w*.5f,h*.48f,n,1.7f,1);}else rec(nextSrc);}
+  void finish(long n){rec(cache);rec(src);cache=nextCache;src=nextSrc;nextCache=nextSrc=null;scene=(scene+1)%scenes.length;transition=false;lastScene=n;}
+  Bitmap scale(Bitmap s){if(s==null||w<1||h<1)return null;float z=Math.max((float)w/s.getWidth(),(float)h/s.getHeight())*1.075f;return Bitmap.createScaledBitmap(s,Math.max(1,Math.round(s.getWidth()*z)),Math.max(1,Math.round(s.getHeight()*z)),true);}void rebuild(){Bitmap b=scale(src);rec(cache);cache=b;if(transition){Bitmap n=scale(nextSrc);rec(nextCache);nextCache=n;}}void rec(Bitmap b){if(b!=null&&!b.isRecycled())b.recycle();}
+  void pulse(float x,float y,long born,float power,int type){if(w>0&&h>0)synchronized(pulses){pulses.add(new Pulse(x,y,born,power,type));}req();}void ambient(long n){if(n-lastPulse<PULSE_MS)return;lastPulse=n;float[] xs={.5f,.34f,.67f,.51f},ys={.3f,.62f,.48f,.74f};int i=ambient++%4;pulse(w*xs[i],h*ys[i],n,.72f*manaPower[scene],2);}
+  void draw(){if(cache==null)return;long n=System.currentTimeMillis();maybeScene(n);ambient(n);rx+=(tx-rx)*.22f;ry+=(ty-ry)*.22f;Canvas c=null;try{c=getSurfaceHolder().lockCanvas();if(c!=null){w=c.getWidth();h=c.getHeight();c.drawColor(0xFF050A16);image(c,cache,255,scene);if(transition&&nextCache!=null){float p=Math.min(1,(n-transStart)/(float)FADE_MS),e=p*p*(3-2*p);image(c,nextCache,(int)(255*e),(scene+1)%scenes.length);transitionMagic(c,p);if(p>=1)finish(n);}ep.setStyle(Paint.Style.FILL);ep.setColor(0x12020A1B);c.drawRect(0,0,w,h,ep);mana(c,n);rings(c,n);}}finally{if(c!=null)getSurfaceHolder().unlockCanvasAndPost(c);}}
+  void image(Canvas c,Bitmap b,int alpha,int si){bp.setAlpha(alpha);float overflowX=b.getWidth()-w,overflowY=b.getHeight()-h;float l=-overflowX*focalX[si]+rx,t=-overflowY*focalY[si]+ry;c.drawBitmap(b,l,t,bp);bp.setAlpha(255);}
+  void transitionMagic(Canvas c,float p){float q=1-Math.abs(p-.5f)*2;int a=(int)(95*q);ep.setStyle(Paint.Style.STROKE);ep.setStrokeWidth(3+10*q);ep.setColor((a<<24)|0xC8F5FF);c.drawCircle(w*.5f,h*.48f,Math.min(w,h)*(.16f+.42f*p),ep);ep.setStyle(Paint.Style.FILL);ep.setColor(((int)(28*q)<<24)|0xA8EFFF);c.drawRect(0,0,w,h,ep);}
+  void mana(Canvas c,long n){float t=((n-start)%16000)/16000f,power=manaPower[scene];int count=scene==2?28:20;for(int i=0;i<count;i++){float seed=(i*.6180339f)%1,x=((seed+t*(.025f+(i%4)*.008f))%1)*w+rx*.28f,y=h-(((i*.137f+t*(.24f+(i%3)*.055f))%1)*h)+ry*.18f,sh=.62f+.38f*(float)Math.sin(t*6.283+i*.72);int a=(int)((22+52*sh)*power);a=Math.min(125,a);ep.setStyle(Paint.Style.FILL);ep.setColor((a<<24)|0xA7EDFF);c.drawCircle(x,y,(1.5f+i%3)*Math.min(1.2f,power),ep);}}
+  void rings(Canvas c,long n){synchronized(pulses){Iterator<Pulse>it=pulses.iterator();while(it.hasNext()){Pulse p=it.next();float d=p.type==2?2.2f:1.55f,age=(n-p.born)/1000f;if(age>d){it.remove();continue;}float q=age/d,e=1-(1-q)*(1-q);int a=(int)((p.type==2?105:205)*(1-q));float r=(24+e*Math.min(w,h)*.29f)*p.power;ep.setStyle(Paint.Style.STROKE);ep.setStrokeWidth((p.type==2?4:7)*(1-q)+1.2f);ep.setColor((a<<24)|(p.type==2?0x9FEAFF:0xD7F7FF));c.drawCircle(p.x,p.y,r,ep);c.drawCircle(p.x,p.y,r*.62f,ep);}}ep.setStyle(Paint.Style.FILL);}
  }
- private static class Pulse{final float x,y,power;final long born;final int type;Pulse(float x,float y,long b,float p,int t){this.x=x;this.y=y;born=b;power=p;type=t;}}
+ static class Pulse{final float x,y,power;final long born;final int type;Pulse(float x,float y,long b,float p,int t){this.x=x;this.y=y;born=b;power=p;type=t;}}
 }
