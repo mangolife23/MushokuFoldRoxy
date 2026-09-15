@@ -6,6 +6,7 @@ import android.content.res.Configuration;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.util.Log;
+import android.view.Display;
 import android.view.Window;
 import android.view.WindowManager;
 
@@ -15,11 +16,14 @@ public class RoxyHomeActivity extends Activity {
     private RoxyHomeView roxyView;
     private int lastWidthDp=-1;
 
+    private int displayId(){ Display d=getDisplay(); return d!=null?d.getDisplayId():-1; }
+
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
-        Log.i(TAG,"onCreate display="+getDisplayId()+" config="+getResources().getConfiguration());
+        lastWidthDp=getResources().getConfiguration().screenWidthDp;
+        Log.i(TAG,"onCreate display="+displayId()+" widthDp="+lastWidthDp+" config="+getResources().getConfiguration());
         bindRenderer(true);
     }
 
@@ -31,20 +35,20 @@ public class RoxyHomeActivity extends Activity {
         if(hasWindowFocus()) roxyView.start();
     }
 
-    @Override protected void onResume(){super.onResume();Log.i(TAG,"onResume display="+getDisplayId());if(roxyView==null)bindRenderer(true);roxyView.start();}
-    @Override protected void onPause(){Log.i(TAG,"onPause display="+getDisplayId());if(roxyView!=null)roxyView.stop();super.onPause();}
-    @Override protected void onDestroy(){Log.i(TAG,"onDestroy display="+getDisplayId()+" changing="+isChangingConfigurations());super.onDestroy();}
+    @Override protected void onResume(){super.onResume();Log.i(TAG,"onResume display="+displayId());if(roxyView==null)bindRenderer(true);roxyView.start();}
+    @Override protected void onPause(){Log.i(TAG,"onPause display="+displayId());if(roxyView!=null)roxyView.stop();super.onPause();}
+    @Override protected void onDestroy(){Log.i(TAG,"onDestroy display="+displayId()+" changing="+isChangingConfigurations());super.onDestroy();}
 
     @Override public void onConfigurationChanged(Configuration c){
         super.onConfigurationChanged(c);
         int width=c.screenWidthDp;
-        Log.i(TAG,"onConfigurationChanged display="+getDisplayId()+" widthDp="+width+" smallest="+c.smallestScreenWidthDp);
+        Log.i(TAG,"onConfigurationChanged display="+displayId()+" widthDp="+width+" smallest="+c.smallestScreenWidthDp);
         boolean majorHandoff=lastWidthDp>0 && Math.abs(width-lastWidthDp)>180;
         lastWidthDp=width;
         if(majorHandoff) bindRenderer(true); else if(roxyView!=null) roxyView.onFoldConfigurationChanged();
     }
 
-    @Override public void onWindowFocusChanged(boolean focus){super.onWindowFocusChanged(focus);Log.i(TAG,"focus="+focus+" display="+getDisplayId());if(focus&&roxyView!=null)roxyView.start();}
+    @Override public void onWindowFocusChanged(boolean focus){super.onWindowFocusChanged(focus);Log.i(TAG,"focus="+focus+" display="+displayId());if(focus&&roxyView!=null)roxyView.start();}
     @Override public void onBackPressed(){ }
 
     public void openLauncherSettings(){try{startActivity(new Intent(Settings.ACTION_HOME_SETTINGS));}catch(Exception ignored){startActivity(new Intent(Settings.ACTION_SETTINGS));}}
