@@ -1,4 +1,4 @@
-name: Build Real Duo Alpha 1
+name: Build Real Duo Roxy Alpha 1
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-real-duo:
+  build-real-duo-roxy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout integration repository
@@ -29,6 +29,66 @@ jobs:
           echo "Actual:   $ACTUAL"
           test "$ACTUAL" = "$EXPECTED"
 
+      - name: Integrate exact Roxy wallpaper
+        run: |
+          test -f app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg
+          test "$(stat -c%s app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg)" = "281677"
+          test "$(sha256sum app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg | cut -d' ' -f1)" = "515eb6b0b09b3b9c276635bcce70423aa33462ac44ce63dca0ff0a41aade1967"
+          mkdir -p duo-stock/app/src/main/res/drawable-nodpi
+          cp app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg duo-stock/app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('duo-stock/app/src/main/java/com/jake/duolauncher/LauncherBackground.kt')
+          s = p.read_text()
+          old_enabled = '''internal fun launcherBackgroundEnabled(context: Context) =
+    launcherBackgroundPreferences(context).getBoolean(BACKGROUND_ENABLED, false) &&
+        launcherBackgroundFile(context).isFile
+'''
+          new_enabled = '''internal fun launcherBackgroundEnabled(context: Context) = true
+'''
+          old_identity = '''internal fun launcherBackgroundIdentity(context: Context): String? {
+    if (!launcherBackgroundEnabled(context)) return null
+    return launcherBackgroundPreferences(context).getString(BACKGROUND_ID, null)
+        ?: "legacy-${launcherBackgroundFile(context).lastModified()}"
+}
+'''
+          new_identity = '''internal fun launcherBackgroundIdentity(context: Context): String? {
+    val file = launcherBackgroundFile(context)
+    val prefs = launcherBackgroundPreferences(context)
+    return if (prefs.getBoolean(BACKGROUND_ENABLED, false) && file.isFile)
+        prefs.getString(BACKGROUND_ID, null) ?: "legacy-${file.lastModified()}"
+    else "roxy-default"
+}
+'''
+          old_load = '''    val file = launcherBackgroundFile(context)
+    val identity = launcherBackgroundIdentity(context)
+    LauncherBackgroundCache.bitmap?.let {
+        if (!it.isRecycled && LauncherBackgroundCache.identity == identity) return it
+    }
+    return BitmapFactory.decodeFile(file.absolutePath)
+'''
+          new_load = '''    val file = launcherBackgroundFile(context)
+    val prefs = launcherBackgroundPreferences(context)
+    val identity = launcherBackgroundIdentity(context)
+    LauncherBackgroundCache.bitmap?.let {
+        if (!it.isRecycled && LauncherBackgroundCache.identity == identity) return it
+    }
+    return if (prefs.getBoolean(BACKGROUND_ENABLED, false) && file.isFile)
+        BitmapFactory.decodeFile(file.absolutePath)
+    else BitmapFactory.decodeResource(context.resources, R.drawable.roxy_wallpaper)
+'''
+          for old, new, label in [
+              (old_enabled, new_enabled, 'enabled'),
+              (old_identity, new_identity, 'identity'),
+              (old_load, new_load, 'loader'),
+          ]:
+              if old not in s:
+                  raise SystemExit(f'Pinned upstream {label} block changed; refusing unsafe patch')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          cmp app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg duo-stock/app/src/main/res/drawable-nodpi/roxy_wallpaper.jpg
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
@@ -43,7 +103,7 @@ jobs:
           yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
           /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Build genuine DuoLauncher debug APK
+      - name: Build genuine DuoLauncher with Roxy
         working-directory: duo-stock
         run: |
           chmod +x gradlew
@@ -52,14 +112,14 @@ jobs:
       - name: Verify and fingerprint APK
         run: |
           test -f duo-stock/app/build/outputs/apk/debug/app-debug.apk
-          cp duo-stock/app/build/outputs/apk/debug/app-debug.apk Real-Duo-Alpha-1.apk
-          sha256sum Real-Duo-Alpha-1.apk | tee Real-Duo-Alpha-1.sha256
+          cp duo-stock/app/build/outputs/apk/debug/app-debug.apk Real-Duo-Roxy-Alpha-1.apk
+          sha256sum Real-Duo-Roxy-Alpha-1.apk | tee Real-Duo-Roxy-Alpha-1.sha256
 
-      - name: Upload Real Duo Alpha 1
+      - name: Upload Real Duo Roxy Alpha 1
         uses: actions/upload-artifact@v4
         with:
-          name: Real-Duo-Alpha-1
+          name: Real-Duo-Roxy-Alpha-1
           path: |
-            Real-Duo-Alpha-1.apk
-            Real-Duo-Alpha-1.sha256
+            Real-Duo-Roxy-Alpha-1.apk
+            Real-Duo-Roxy-Alpha-1.sha256
           if-no-files-found: error
