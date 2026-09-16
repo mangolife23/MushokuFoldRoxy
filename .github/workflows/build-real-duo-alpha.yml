@@ -1,0 +1,65 @@
+name: Build Real Duo Alpha 1
+
+on:
+  push:
+    branches: [ "roxy-real-duolauncher" ]
+    paths:
+      - ".github/workflows/build-real-duo-alpha.yml"
+  workflow_dispatch:
+
+jobs:
+  build-real-duo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration repository
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned genuine DuoLauncher
+        uses: actions/checkout@v4
+        with:
+          repository: jakesgoodapps/DuoLauncher
+          ref: f1bc0f1c5a76637f3fc46a60beed5c331b5fd917
+          path: duo-stock
+
+      - name: Verify pinned upstream commit
+        run: |
+          EXPECTED="f1bc0f1c5a76637f3fc46a60beed5c331b5fd917"
+          ACTUAL="$(git -C duo-stock rev-parse HEAD)"
+          echo "Expected: $EXPECTED"
+          echo "Actual:   $ACTUAL"
+          test "$ACTUAL" = "$EXPECTED"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure Android SDK
+        run: |
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          echo "/usr/local/lib/android/sdk/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "/usr/local/lib/android/sdk/platform-tools" >> "$GITHUB_PATH"
+          yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
+          /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Build genuine DuoLauncher debug APK
+        working-directory: duo-stock
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Verify and fingerprint APK
+        run: |
+          test -f duo-stock/app/build/outputs/apk/debug/app-debug.apk
+          cp duo-stock/app/build/outputs/apk/debug/app-debug.apk Real-Duo-Alpha-1.apk
+          sha256sum Real-Duo-Alpha-1.apk | tee Real-Duo-Alpha-1.sha256
+
+      - name: Upload Real Duo Alpha 1
+        uses: actions/upload-artifact@v4
+        with:
+          name: Real-Duo-Alpha-1
+          path: |
+            Real-Duo-Alpha-1.apk
+            Real-Duo-Alpha-1.sha256
+          if-no-files-found: error
