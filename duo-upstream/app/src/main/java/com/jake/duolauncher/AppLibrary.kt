@@ -51,12 +51,24 @@ internal fun AppLibrary(
     var showWork by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val selectedProfile = if (showWork) state.profiles.firstOrNull { it.isWork } else state.profiles.firstOrNull { it.isPersonal }
-    LaunchedEffect(showWork, selectedProfile?.available, selectedProfile?.quiet) { listState.scrollToItem(0) }
-    val visibleApps = remember(state.apps, query, showWork, hasWork) { state.apps.filter { (!hasWork || it.isWork == showWork) && it.label.contains(query.trim(), true) } }
-    val groups = remember(visibleApps) { visibleApps.groupBy { it.label.firstOrNull()?.takeIf(Char::isLetter)?.uppercaseChar()?.toString() ?: "#" } }
-    Surface(modifier, shape = RoundedCornerShape(24.dp), color = if (glass) Glass.copy(alpha = .48f) else MaterialTheme.colorScheme.surface, contentColor = ink,
+    LaunchedEffect(showWork, selectedProfile?.available, selectedProfile?.quiet) {
+        listState.scrollToItem(0)
+    }
+    val visibleApps = remember(state.apps, query, showWork, hasWork) {
+        state.apps.filter { (!hasWork || it.isWork == showWork) && it.label.contains(query.trim(), true) }
+    }
+    val groups = remember(visibleApps) {
+        visibleApps.groupBy {
+            it.label.firstOrNull()?.takeIf(Char::isLetter)?.uppercaseChar()?.toString() ?: "#"
+        }
+    }
+    Surface(modifier, shape = RoundedCornerShape(24.dp),
+        color = if (glass) Glass.copy(alpha = .48f) else MaterialTheme.colorScheme.surface,
+        contentColor = ink,
         border = if (glass) BorderStroke(1.dp, Color.White.copy(alpha = .38f)) else null) {
-        Column(Modifier.background(Brush.verticalGradient(if (glass) listOf(Color.White.copy(alpha = .09f), Color.Transparent) else listOf(Color.Transparent, Color.Transparent))).padding(horizontal = 16.dp).padding(top = 18.dp)) {
+        Column(Modifier.background(Brush.verticalGradient(if (glass)
+            listOf(Color.White.copy(alpha = .09f), Color.Transparent) else listOf(Color.Transparent, Color.Transparent)))
+            .padding(horizontal = 16.dp).padding(top = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if (editing) "Choose home apps" else "All apps", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
                 Text(if (editing) "${pinned.size} pinned" else "${visibleApps.size}", color = ink, fontSize = 12.sp)
@@ -65,18 +77,59 @@ internal fun AppLibrary(
                 FilterChip(selected = !showWork, onClick = { showWork = false }, label = { Text("Personal") })
                 FilterChip(selected = showWork, onClick = { showWork = true }, label = { Text("Work") })
             }
-            OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().padding(vertical = 12.dp).testTag(if (editing) "pin-search" else "library-search"), placeholder = { Text("Search apps") }, singleLine = true, shape = RoundedCornerShape(16.dp), leadingIcon = { Icon(Icons.Rounded.Search, null) }, trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, "Clear search") } }, colors = if (glass) OutlinedTextFieldDefaults.colors(focusedTextColor = ink, unfocusedTextColor = ink, cursorColor = ink, focusedContainerColor = Color.White.copy(alpha = .18f), unfocusedContainerColor = Color.White.copy(alpha = .12f), focusedBorderColor = Color.White.copy(alpha = .8f), unfocusedBorderColor = Color.White.copy(alpha = .45f), focusedPlaceholderColor = ink, unfocusedPlaceholderColor = ink, focusedLeadingIconColor = ink, unfocusedLeadingIconColor = ink, focusedTrailingIconColor = ink, unfocusedTrailingIconColor = ink) else OutlinedTextFieldDefaults.colors())
-            LazyColumn(Modifier.weight(1f).testTag("all-apps-list"), state = listState, contentPadding = PaddingValues(bottom = 12.dp)) {
-                if (showWork && selectedProfile?.available == false) item("work-paused") { Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(if (selectedProfile.quiet) "Work apps are paused" else "Work profile is unavailable"); if (selectedProfile.quiet) Button(onClick = { onTurnOnWork(selectedProfile.userSerial) }, Modifier.padding(top = 10.dp).testTag("turn-on-work")) { Text("Turn on work apps") } } }
+            OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().padding(vertical = 12.dp).testTag(if (editing) "pin-search" else "library-search"),
+                placeholder = { Text("Search apps") }, singleLine = true, shape = RoundedCornerShape(16.dp),
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, "Clear search") } },
+                colors = if (glass) OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = ink, unfocusedTextColor = ink, cursorColor = ink,
+                    focusedContainerColor = Color.White.copy(alpha = .18f), unfocusedContainerColor = Color.White.copy(alpha = .12f),
+                    focusedBorderColor = Color.White.copy(alpha = .8f), unfocusedBorderColor = Color.White.copy(alpha = .45f),
+                    focusedPlaceholderColor = ink, unfocusedPlaceholderColor = ink,
+                    focusedLeadingIconColor = ink, unfocusedLeadingIconColor = ink,
+                    focusedTrailingIconColor = ink, unfocusedTrailingIconColor = ink,
+                ) else OutlinedTextFieldDefaults.colors())
+            LazyColumn(Modifier.weight(1f).testTag("all-apps-list"), state = listState,
+                contentPadding = PaddingValues(bottom = 12.dp)) {
+                if (showWork && selectedProfile?.available == false) item("work-paused") {
+                    Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(if (selectedProfile.quiet) "Work apps are paused" else "Work profile is unavailable")
+                        if (selectedProfile.quiet) Button(onClick = { onTurnOnWork(selectedProfile.userSerial) },
+                            Modifier.padding(top = 10.dp).testTag("turn-on-work")) { Text("Turn on work apps") }
+                    }
+                }
                 if (groups.isEmpty()) item { Text(if (state.loading) "Loading apps…" else "No apps found", Modifier.padding(vertical = 20.dp)) }
                 groups.forEach { (letter, entries) ->
-                    stickyHeader(key = "heading-$letter") { Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(width = 32.dp, height = 28.dp).background(if (glass) (if (palette.dark) Color(0xFF314852) else Color(0xFFB7CBD3)) else MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Text(letter, color = ink, fontWeight = FontWeight.SemiBold, fontSize = 12.sp) }; if (glass) HorizontalDivider(Modifier.weight(1f).padding(start = 10.dp), color = Color.White.copy(alpha = .24f)) } }
+                    stickyHeader(key = "heading-$letter") {
+                        Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            // An opaque small chip prevents text from showing through the sticky letter.
+                            Box(Modifier.size(width = 32.dp, height = 28.dp).background(
+                                if (glass) (if (palette.dark) Color(0xFF314852) else Color(0xFFB7CBD3))
+                                else MaterialTheme.colorScheme.surfaceContainer,
+                                RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                                Text(letter, color = ink, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            }
+                            if (glass) HorizontalDivider(Modifier.weight(1f).padding(start = 10.dp), color = Color.White.copy(alpha = .24f))
+                        }
+                    }
                     items(entries, key = { it.id }) { app ->
-                        val isPinned = app.id in pinned; val launchBounds = remember { android.graphics.Rect() }; val dragModifier = if (drag != null) Modifier.dropRegion(drag, DropTarget.Library(app.id), app.id, page) else Modifier; val click = { if (editing) onPin(app.id, !isPinned) else onLaunchFrom(app, launchBounds) }
-                        Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).then(dragModifier).clip(RoundedCornerShape(14.dp)).testTag("library-app-${app.id}").then(if (drag == null) Modifier.combinedClickable(onClick = click, onLongClick = { onActions(app) }) else Modifier.clickable(onClick = click).semantics { onLongClick("App options") { onActions(app); true } }).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Image(app.icon.asImageBitmap(), null, Modifier.size(40.dp).onGloballyPositioned { launchBounds.set(it.boundsInWindow().toAndroidBounds()) }.clip(RoundedCornerShape(10.dp)))
+                        val isPinned = app.id in pinned
+                        val launchBounds = remember { android.graphics.Rect() }
+                        val dragModifier = if (drag != null) Modifier.dropRegion(drag, DropTarget.Library(app.id), app.id, page) else Modifier
+                        val click = { if (editing) onPin(app.id, !isPinned) else onLaunchFrom(app, launchBounds) }
+                        Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).then(dragModifier).clip(RoundedCornerShape(14.dp)).testTag("library-app-${app.id}")
+                            .then(if (drag == null) Modifier.combinedClickable(onClick = click, onLongClick = { onActions(app) })
+                                else Modifier.clickable(onClick = click).semantics { onLongClick("App options") { onActions(app); true } })
+                            .padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Image(app.icon.asImageBitmap(), null, Modifier.size(40.dp)
+                                .onGloballyPositioned { launchBounds.set(it.boundsInWindow().toAndroidBounds()) }.clip(RoundedCornerShape(10.dp)))
                             Text(app.label, Modifier.weight(1f).padding(start = 12.dp), maxLines = 2, fontSize = 14.sp)
-                            if (editing) IconButton(onClick = { onPin(app.id, !isPinned) }, Modifier.testTag("pin-${app.id}")) { Icon(if (isPinned) Icons.Rounded.PushPin else Icons.Outlined.PushPin, if (isPinned) "Remove ${app.label} from home" else "Pin ${app.label} to home", tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp)) }
+                            if (editing) IconButton(onClick = { onPin(app.id, !isPinned) }, Modifier.testTag("pin-${app.id}")) {
+                                Icon(if (isPinned) Icons.Rounded.PushPin else Icons.Outlined.PushPin,
+                                    if (isPinned) "Remove ${app.label} from home" else "Pin ${app.label} to home",
+                                    tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.size(20.dp))
+                            }
                         }
                     }
                 }
