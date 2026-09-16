@@ -6,6 +6,7 @@ on:
       - roxy-real-duolauncher
     paths:
       - .github/workflows/build-real-duo-alpha.yml
+      - scripts/patch_real_duo_roxy.py
   workflow_dispatch:
 
 jobs:
@@ -42,8 +43,7 @@ jobs:
           cmp "$SOURCE" "$TARGET"
 
       - name: Patch genuine Duo default background to Roxy
-        run: |
-          python3 scripts/patch_real_duo_roxy.py duo-stock
+        run: python3 scripts/patch_real_duo_roxy.py duo-stock
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
