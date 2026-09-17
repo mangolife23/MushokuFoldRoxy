@@ -47,47 +47,61 @@ for old,new,label in ((old_enabled,new_enabled,"enabled"),(old_identity,new_iden
     s=s.replace(old,new,1)
 p.write_text(s)
 
-# Add a direct, deliberately visible Roxy overlay. It is independent of Duo's experimental
-# PixelCopy renderer and does not alter Duo's display handoff. On an expanded viewport the exact
-# embedded Roxy drawable is placed above the live launcher, starts as a narrow center pane, then
-# expands/fades away to reveal normal Duo underneath.
+# Diagnostic proof build: do not use Duo's PixelCopy experiment. On any expanded inner viewport,
+# put the exact Roxy drawable above the live launcher as a visibly narrow center pane, hold it long
+# enough to be unmistakable, expand it across the entire display for 2.5 seconds, hold full-screen,
+# then fade it away. This intentionally favors proof of execution over polish and leaves Duo's
+# already-working display handoff untouched.
 main = root / "app/src/main/java/com/jake/duolauncher/MainActivity.kt"
 m = main.read_text()
 old_import = "import android.widget.Toast\n"
 new_import = """import android.widget.Toast
 import android.widget.ImageView
 import android.view.ViewGroup
-import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.LinearInterpolator
 """
 old_attach = """        FoldRenderExperiment.attach(this)
         // Reassert the token after recreation"""
-new_attach = """        window.decorView.post { playRoxyInnerReveal() }
+new_attach = """        window.decorView.postDelayed({ playRoxyDiagnosticReveal() }, 350L)
         // Reassert the token after recreation"""
 old_marker = """    override fun onStart() {
 """
-new_marker = """    private fun playRoxyInnerReveal() {
+new_marker = """    private fun playRoxyDiagnosticReveal() {
         if (resources.configuration.screenWidthDp < 650 || isFinishing || isDestroyed) return
         val root = window.decorView as? ViewGroup ?: return
+        if (root.width <= 0 || root.height <= 0) {
+            root.postDelayed({ playRoxyDiagnosticReveal() }, 150L)
+            return
+        }
         val image = ImageView(this).apply {
             setImageResource(R.drawable.roxy_wallpaper)
             scaleType = ImageView.ScaleType.CENTER_CROP
             pivotX = root.width / 2f
             pivotY = root.height / 2f
-            scaleX = 0.08f
+            scaleX = 0.04f
+            scaleY = 1f
             alpha = 1f
             elevation = 1000f
+            contentDescription = \"Roxy diagnostic reveal\"
         }
         root.addView(image, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        image.animate().scaleX(1f).setDuration(620L)
-            .setInterpolator(AccelerateDecelerateInterpolator()).withEndAction {
-                image.animate().alpha(0f).setDuration(260L).withEndAction { root.removeView(image) }.start()
+        // Hold the 4%-wide pane for 700 ms so the starting state cannot be missed.
+        image.postDelayed({
+            if (image.parent == null) return@postDelayed
+            image.animate().scaleX(1f).setDuration(2500L).setInterpolator(LinearInterpolator()).withEndAction {
+                // Hold full-screen Roxy for another second before restoring normal Duo.
+                image.postDelayed({
+                    if (image.parent == null) return@postDelayed
+                    image.animate().alpha(0f).setDuration(500L).withEndAction { root.removeView(image) }.start()
+                }, 1000L)
             }.start()
+        }, 700L)
     }
 
     override fun onStart() {
 """
-for old,new,label in ((old_import,new_import,"animation imports"),(old_attach,new_attach,"animation attachment"),(old_marker,new_marker,"animation method")):
+for old,new,label in ((old_import,new_import,"diagnostic imports"),(old_attach,new_attach,"diagnostic attachment"),(old_marker,new_marker,"diagnostic method")):
     if m.count(old)!=1: raise SystemExit(f"Pinned upstream {label} block changed; refusing unsafe patch")
     m=m.replace(old,new,1)
 main.write_text(m)
-print("Applied deterministic Roxy background + direct inner-screen reveal overlay")
+print("Applied deterministic Roxy background + unmistakable 2.5s inner-screen diagnostic reveal")
