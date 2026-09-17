@@ -2,19 +2,15 @@
 from pathlib import Path
 import sys
 
-if len(sys.argv) != 2:
-    raise SystemExit("usage: patch_real_duo_roxy.py <duo-source-root>")
-
+if len(sys.argv) != 2: raise SystemExit("usage: patch_real_duo_roxy.py <duo-source-root>")
 root = Path(sys.argv[1])
 p = root / "app/src/main/java/com/jake/duolauncher/LauncherBackground.kt"
 s = p.read_text()
-
 old_enabled = """internal fun launcherBackgroundEnabled(context: Context) =
     launcherBackgroundPreferences(context).getBoolean(BACKGROUND_ENABLED, false) &&
         launcherBackgroundFile(context).isFile
 """
-new_enabled = """internal fun launcherBackgroundEnabled(context: Context) = true
-"""
+new_enabled = "internal fun launcherBackgroundEnabled(context: Context) = true\n"
 old_identity = """internal fun launcherBackgroundIdentity(context: Context): String? {
     if (!launcherBackgroundEnabled(context)) return null
     return launcherBackgroundPreferences(context).getString(BACKGROUND_ID, null)
@@ -46,72 +42,52 @@ new_load = """    val file = launcherBackgroundFile(context)
         BitmapFactory.decodeFile(file.absolutePath)
     else BitmapFactory.decodeResource(context.resources, R.drawable.roxy_wallpaper)
 """
-for old, new, label in ((old_enabled,new_enabled,"enabled"),(old_identity,new_identity,"identity"),(old_load,new_load,"loader")):
-    if s.count(old) != 1: raise SystemExit(f"Pinned upstream {label} block changed; refusing unsafe patch")
-    s = s.replace(old,new,1)
+for old,new,label in ((old_enabled,new_enabled,"enabled"),(old_identity,new_identity,"identity"),(old_load,new_load,"loader")):
+    if s.count(old)!=1: raise SystemExit(f"Pinned upstream {label} block changed; refusing unsafe patch")
+    s=s.replace(old,new,1)
 p.write_text(s)
 
-# Keep genuine Duo's proven display handoff untouched. Instead, turn its debug renderer into an
-# explicit inner-viewport animation: once the expanded Fold7 viewport is active, capture that
-# live inner frame and replay it through Duo's existing pane/plane transform. This does not depend
-# on carrying a cover-screen frame across Activity lifecycle events.
-motion = root / "app/src/debug/java/com/jake/duolauncher/FoldRenderExperiment.kt"
-m = motion.read_text()
-old_flag = """    private var enabled = false
+# Add a direct, deliberately visible Roxy overlay. It is independent of Duo's experimental
+# PixelCopy renderer and does not alter Duo's display handoff. On an expanded viewport the exact
+# embedded Roxy drawable is placed above the live launcher, starts as a narrow center pane, then
+# expands/fades away to reveal normal Duo underneath.
+main = root / "app/src/main/java/com/jake/duolauncher/MainActivity.kt"
+m = main.read_text()
+old_import = "import android.widget.Toast\n"
+new_import = """import android.widget.Toast
+import android.widget.ImageView
+import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
 """
-new_flag = """    private var enabled = true
+old_attach = """        FoldRenderExperiment.attach(this)
+        // Reassert the token after recreation"""
+new_attach = """        window.decorView.post { playRoxyInnerReveal() }
+        // Reassert the token after recreation"""
+old_marker = """    override fun onStart() {
 """
-old_attach = """    fun attach(activity: MainActivity) {
-        if (activity.intent.getBooleanExtra(EXTRA, false)) {
-            enabled = true
-            Log.i(TAG, \"enabled from create intent\")
+new_marker = """    private fun playRoxyInnerReveal() {
+        if (resources.configuration.screenWidthDp < 650 || isFinishing || isDestroyed) return
+        val root = window.decorView as? ViewGroup ?: return
+        val image = ImageView(this).apply {
+            setImageResource(R.drawable.roxy_wallpaper)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            pivotX = root.width / 2f
+            pivotY = root.height / 2f
+            scaleX = 0.08f
+            alpha = 1f
+            elevation = 1000f
         }
-        Controller(activity).also {
+        root.addView(image, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        image.animate().scaleX(1f).setDuration(620L)
+            .setInterpolator(AccelerateDecelerateInterpolator()).withEndAction {
+                image.animate().alpha(0f).setDuration(260L).withEndAction { root.removeView(image) }.start()
+            }.start()
+    }
+
+    override fun onStart() {
 """
-new_attach = """    fun attach(activity: MainActivity) {
-        enabled = true
-        Controller(activity).also {
-"""
-old_state = """        private var observedViewportKey: String? = null
-"""
-new_state = """        private var observedViewportKey: String? = null
-        private var innerPanePlayed = false
-"""
-old_activate = """                observedViewportKey = viewportKey(decor.width, decor.height)
-                val source = sourceFor(decor.width, decor.height)
-                if (source != null) beginTransition(source, \"configuration handoff\")
-                else scheduleSample(80L)
-"""
-new_activate = """                observedViewportKey = viewportKey(decor.width, decor.height)
-                if (expanded() && !innerPanePlayed) {
-                    innerPanePlayed = true
-                    // The inner display is already live. Capture it, then deliberately run Duo's
-                    // pane transform so unfolding has a visible Roxy transition without altering
-                    // the launcher's working cover/inner handoff.
-                    copyWindow(900L, retryNoData = true) { bitmap ->
-                        if (bitmap != null && active()) {
-                            val frame = Frame(bitmap, SystemClock.uptimeMillis(), expanded = false)
-                            beginTransition(frame, \"Roxy inner pane\")
-                        } else {
-                            bitmap?.recycle()
-                            innerPanePlayed = false
-                            scheduleSample(120L)
-                        }
-                    }
-                } else scheduleSample(80L)
-"""
-old_controls = """        private fun addControls() {
-            if (controls != null) return
-            val pad = (10 * activity.resources.displayMetrics.density).toInt()
-"""
-new_controls = """        private fun addControls() {
-            return
-            @Suppress(\"UNREACHABLE_CODE\")
-            if (controls != null) return
-            val pad = (10 * activity.resources.displayMetrics.density).toInt()
-"""
-for old,new,label in ((old_flag,new_flag,"fold animation enabled flag"),(old_attach,new_attach,"fold animation attach"),(old_state,new_state,"inner pane state"),(old_activate,new_activate,"inner viewport trigger"),(old_controls,new_controls,"fold animation controls")):
-    if m.count(old) != 1: raise SystemExit(f"Pinned upstream {label} block changed; refusing unsafe patch")
-    m = m.replace(old,new,1)
-motion.write_text(m)
-print("Applied deterministic Roxy background + inner viewport pane animation patch")
+for old,new,label in ((old_import,new_import,"animation imports"),(old_attach,new_attach,"animation attachment"),(old_marker,new_marker,"animation method")):
+    if m.count(old)!=1: raise SystemExit(f"Pinned upstream {label} block changed; refusing unsafe patch")
+    m=m.replace(old,new,1)
+main.write_text(m)
+print("Applied deterministic Roxy background + direct inner-screen reveal overlay")
