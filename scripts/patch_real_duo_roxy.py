@@ -60,15 +60,20 @@ for old, new, label in (
 
 p.write_text(s)
 
-# The pinned Duo source already contains its fold snapshot/plane animation lab in the debug
-# source set. Alpha APKs are debug builds, so enable that existing implementation by default
-# and remove its developer controls. This keeps the animation implementation tied to the exact
-# pinned Duo source rather than replacing it with a separate approximation.
+# Enable Duo's debug fold renderer automatically. Samsung's cover->inner display handoff can
+# stop the cover-screen Activity without reporting isChangingConfigurations, so preserve the
+# most recent cover frame across that lifecycle stop. The next inner-screen Activity can then
+# consume it and run the existing cover->inner plane transition. Frames remain memory-only and
+# expire quickly; extending the TTL gives the physical display switch enough handoff time.
 motion = root / "app/src/debug/java/com/jake/duolauncher/FoldRenderExperiment.kt"
 m = motion.read_text()
 old_flag = """    private var enabled = false
 """
 new_flag = """    private var enabled = true
+"""
+old_ttl = """    private const val FRAME_TTL_MS = 2_000L
+"""
+new_ttl = """    private const val FRAME_TTL_MS = 5_000L
 """
 old_attach = """    fun attach(activity: MainActivity) {
         if (activity.intent.getBooleanExtra(EXTRA, false)) {
@@ -80,6 +85,19 @@ old_attach = """    fun attach(activity: MainActivity) {
 new_attach = """    fun attach(activity: MainActivity) {
         enabled = true
         Controller(activity).also {
+"""
+old_stop = """        override fun onStop(owner: LifecycleOwner) {
+            foreground = false
+            suspendProbe(removeControls = true)
+            if (!activity.isChangingConfigurations) clearFrames()
+        }
+"""
+new_stop = """        override fun onStop(owner: LifecycleOwner) {
+            foreground = false
+            suspendProbe(removeControls = true)
+            // Preserve the latest cover frame across Samsung's cover -> inner display handoff.
+            // sourceFor() accepts it only while fresh and only for a differently-sized viewport.
+        }
 """
 old_controls = """        private fun addControls() {
             if (controls != null) return
@@ -94,7 +112,9 @@ new_controls = """        private fun addControls() {
 """
 for old, new, label in (
     (old_flag, new_flag, "fold animation enabled flag"),
+    (old_ttl, new_ttl, "fold frame TTL"),
     (old_attach, new_attach, "fold animation attach"),
+    (old_stop, new_stop, "fold lifecycle handoff"),
     (old_controls, new_controls, "fold animation controls"),
 ):
     if m.count(old) != 1:
@@ -102,4 +122,4 @@ for old, new, label in (
     m = m.replace(old, new, 1)
 motion.write_text(m)
 
-print("Applied deterministic Roxy background + Duo fold-animation patch")
+print("Applied deterministic Roxy background + Fold7 unfold handoff patch")
