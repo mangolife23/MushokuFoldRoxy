@@ -73,6 +73,7 @@ new_marker = """    private var roxyLastViewportWidth = 0
     private var roxyRevealRunning = false
     private var roxyLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
     private var roxyManaView: RoxyManaView? = null
+    private data class RoxyBurst(val x: Float, val y: Float, val born: Long, val seed: Int)
 
     private fun installRoxyViewportTransitionProbe() {
         val root = window.decorView
@@ -115,15 +116,14 @@ new_marker = """    private var roxyLastViewportWidth = 0
 
     private inner class RoxyManaView : View(this) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private data class Burst(val x: Float, val y: Float, val born: Long, val seed: Int)
-        private val bursts = ArrayDeque<Burst>()
+        private val bursts = ArrayDeque<RoxyBurst>()
         private var lastTouchBurst = 0L
         private var unfoldBorn = 0L
 
         fun manaTouch(x: Float, y: Float, now: Long) {
             if (now - lastTouchBurst < 38L) return
             lastTouchBurst = now
-            bursts.addLast(Burst(x, y, now, (x.toInt() * 31 + y.toInt()) and 0x7fffffff))
+            bursts.addLast(RoxyBurst(x, y, now, (x.toInt() * 31 + y.toInt()) and 0x7fffffff))
             while (bursts.size > 14) bursts.removeFirst()
             postInvalidateOnAnimation()
         }
@@ -138,8 +138,6 @@ new_marker = """    private var roxyLastViewportWidth = 0
             val now = android.os.SystemClock.uptimeMillis()
             val w = width.toFloat().coerceAtLeast(1f)
             val h = height.toFloat().coerceAtLeast(1f)
-
-            // Ambient water/mana droplets drift upward at different speeds.
             repeat(22) { i ->
                 val phase = ((now * (18L + i % 5) + i * 7919L) % 12000L) / 12000f
                 val x = ((i * 0.6180339f + 0.13f) % 1f) * w
@@ -154,10 +152,8 @@ new_marker = """    private var roxyLastViewportWidth = 0
                 paint.color = Color.argb((35 + 55 * shimmer).toInt(), 205, 245, 255)
                 canvas.drawCircle(x, y, r + 3.5f, paint)
             }
-
-            // Every touch emits a short-lived mana ripple plus orbiting droplets.
             val iterator = bursts.iterator()
-            val expired = ArrayList<Burst>()
+            val expired = ArrayList<RoxyBurst>()
             while (iterator.hasNext()) {
                 val b = iterator.next()
                 val age = (now - b.born).coerceAtLeast(0L)
@@ -179,8 +175,6 @@ new_marker = """    private var roxyLastViewportWidth = 0
                 }
             }
             expired.forEach { bursts.remove(it) }
-
-            // Unfold adds one broad mana wave without replacing the launcher.
             if (unfoldBorn > 0L) {
                 val age = now - unfoldBorn
                 if (age < 900L) {
@@ -191,7 +185,6 @@ new_marker = """    private var roxyLastViewportWidth = 0
                     canvas.drawCircle(w / 2f, h / 2f, 40f + t * kotlin.math.max(w, h) * 0.62f, paint)
                 } else unfoldBorn = 0L
             }
-
             if (bursts.isNotEmpty() || unfoldBorn > 0L || isShown) postInvalidateOnAnimation()
         }
     }
@@ -207,19 +200,14 @@ new_marker = """    private var roxyLastViewportWidth = 0
         content.scaleX = 0.90f
         content.scaleY = 0.97f
         content.alpha = 0.82f
-        content.animate()
-            .scaleX(1f)
-            .scaleY(1f)
-            .alpha(1f)
-            .setDuration(420L)
-            .setInterpolator(DecelerateInterpolator(1.7f))
+        content.animate().scaleX(1f).scaleY(1f).alpha(1f)
+            .setDuration(420L).setInterpolator(DecelerateInterpolator(1.7f))
             .withEndAction {
                 content.scaleX = 1f
                 content.scaleY = 1f
                 content.alpha = 1f
                 roxyRevealRunning = false
-            }
-            .start()
+            }.start()
     }
 
     override fun onStart() {
