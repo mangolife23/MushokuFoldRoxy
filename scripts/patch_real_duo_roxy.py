@@ -95,6 +95,44 @@ new_marker = """    private var roxyLastViewportWidth = 0
         root.viewTreeObserver.addOnGlobalLayoutListener(listener)
     }
 
+    private fun installRoxySceneLayer() {
+        val host = findViewById<ViewGroup>(android.R.id.content) ?: return
+        if (roxySceneView != null) return
+        val scene = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            alpha = 0f
+            isClickable = false
+            isFocusable = false
+        }
+        host.addView(scene, 0, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ))
+        roxySceneView = scene
+        scheduleRoxyScene()
+    }
+
+    private fun scheduleRoxyScene() {
+        val scene = roxySceneView ?: return
+        val names = arrayOf("roxy_wallpaper", "roxy_scene_02", "roxy_scene_03", "roxy_scene_04", "roxy_scene_05")
+        val run = object : Runnable {
+            override fun run() {
+                val id = resources.getIdentifier(names[roxySceneIndex % names.size], "drawable", packageName)
+                if (id != 0) {
+                    scene.setImageResource(id)
+                    scene.scaleX = 1.025f
+                    scene.scaleY = 1.025f
+                    scene.alpha = 0f
+                    scene.animate().alpha(0.42f).scaleX(1f).scaleY(1f).setDuration(1800L).start()
+                }
+                roxySceneIndex = (roxySceneIndex + 1) % names.size
+                scene.postDelayed(this, 30000L)
+            }
+        }
+        roxySceneRunnable = run
+        scene.post(run)
+    }
+
     private fun installRoxyManaLayer() {
         val host = findViewById<ViewGroup>(android.R.id.content) ?: return
         if (roxyManaView != null) return
@@ -139,7 +177,7 @@ new_marker = """    private var roxyLastViewportWidth = 0
             val w = width.toFloat().coerceAtLeast(1f)
             val h = height.toFloat().coerceAtLeast(1f)
             repeat(22) { i ->
-                val phase = ((now * (18L + i % 5) + i * 7919L) % 12000L) / 12000f
+                val phase = ((now * (5L + i % 3) + i * 7919L) % 24000L) / 24000f
                 val x = ((i * 0.6180339f + 0.13f) % 1f) * w
                 val y = h - phase * (h + 180f)
                 val r = 2.5f + (i % 5) * 1.35f
@@ -195,13 +233,13 @@ new_marker = """    private var roxyLastViewportWidth = 0
         if (content.width <= 0 || content.height <= 0) return
         roxyRevealRunning = true
         content.animate().cancel()
-        content.pivotX = content.width / 2f
-        content.pivotY = content.height / 2f
-        content.scaleX = 0.90f
-        content.scaleY = 0.97f
-        content.alpha = 0.82f
-        content.animate().scaleX(1f).scaleY(1f).alpha(1f)
-            .setDuration(420L).setInterpolator(DecelerateInterpolator(1.7f))
+        // Do not scale the live Activity content during Fold7 resize; that produced the
+        // hardware-observed half-screen frame. Let Android settle full-size, then fade.
+        content.scaleX = 1f
+        content.scaleY = 1f
+        content.alpha = 0.90f
+        content.animate().alpha(1f)
+            .setDuration(650L).setInterpolator(DecelerateInterpolator(1.7f))
             .withEndAction {
                 content.scaleX = 1f
                 content.scaleY = 1f
