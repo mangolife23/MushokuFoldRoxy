@@ -53,6 +53,7 @@ main = root / "app/src/main/java/com/jake/duolauncher/MainActivity.kt"
 m = main.read_text()
 old_import = "import android.widget.Toast\n"
 new_import = """import android.widget.Toast
+import android.widget.ImageView
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -65,6 +66,7 @@ import android.view.ViewTreeObserver
 old_attach = """        FoldRenderExperiment.attach(this)
         // Reassert the token after recreation"""
 new_attach = """        installRoxyViewportTransitionProbe()
+        installRoxySceneLayer()
         installRoxyManaLayer()
         // Reassert the token after recreation"""
 old_marker = """    override fun onStart() {
@@ -73,6 +75,9 @@ new_marker = """    private var roxyLastViewportWidth = 0
     private var roxyRevealRunning = false
     private var roxyLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
     private var roxyManaView: RoxyManaView? = null
+    private var roxySceneView: ImageView? = null
+    private var roxySceneIndex = 0
+    private var roxySceneRunnable: Runnable? = null
     private data class RoxyBurst(val x: Float, val y: Float, val born: Long, val seed: Int)
 
     private fun installRoxyViewportTransitionProbe() {
@@ -87,8 +92,7 @@ new_marker = """    private var roxyLastViewportWidth = 0
             val previousDp = previous / density
             val currentDp = width / density
             if (previousDp < 650f && currentDp >= 650f && width >= previous * 1.35f) {
-                playRoxyLiveLauncherReveal()
-                roxyManaView?.unfoldBurst()
+                root.post { root.postDelayed({ playRoxyLiveLauncherReveal(); roxyManaView?.unfoldBurst() }, 180L) }
             }
         }
         roxyLayoutListener = listener
@@ -259,6 +263,9 @@ new_destroy = """    override fun onDestroy() {
         }
         roxyLayoutListener = null
         roxyManaView = null
+        roxySceneRunnable?.let { roxySceneView?.removeCallbacks(it) }
+        roxySceneRunnable = null
+        roxySceneView = null
         recreatingShadeSetup = isChangingConfigurations
 """
 for old,new,label in ((old_import,new_import,"mana imports"),(old_attach,new_attach,"mana attachment"),(old_marker,new_marker,"mana methods"),(old_destroy,new_destroy,"mana cleanup")):
